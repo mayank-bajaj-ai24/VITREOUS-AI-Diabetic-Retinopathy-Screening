@@ -1,0 +1,67 @@
+# ═══════════════════════════════════════════════════════
+# NETRA — Requirements
+# ═══════════════════════════════════════════════════════
+# Install:  pip install -r requirements.txt
+# ═══════════════════════════════════════════════════════
+
+# ─── Core AI / ML ───
+torch>=2.1.0
+torchvision>=0.16.0
+timm>=0.9.12                    # Pretrained EfficientNet-B4, ResNet-50
+segmentation-models-pytorch>=0.3.3  # UNet++ implementation
+
+# ─── Image Processing (Quality Gate + Enhancement) ───
+opencv-python>=4.9.0
+numpy>=1.24.0
+Pillow>=10.0.0
+scikit-image>=0.21.0
+
+# ─── Explainability / XAI ───
+grad-cam>=1.5.0                 # Grad-CAM, Score-CAM
+shap>=0.43.0                    # SHAP explanations
+matplotlib>=3.8.0               # Visualization, heatmaps, reliability diagrams
+
+# ─── Backend API ───
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6         # File uploads
+pydantic>=2.5.0
+
+# ─── Databases ───
+psycopg2-binary>=2.9.9          # PostgreSQL
+pymongo>=4.6.0                  # MongoDB
+redis>=5.0.0                    # Redis cache
+boto3>=1.34.0                   # Amazon S3
+
+# ─── LLM / Multi-Agent / RAG ───
+langchain>=0.1.0
+langgraph>=0.0.40
+llama-index>=0.10.0
+pinecone-client>=3.0.0          # Pinecone vector DB
+neo4j>=5.15.0                   # Neo4j graph DB
+nemoguardrails>=0.6.0           # NeMo Guardrails (clinical safety)
+guardrails-ai>=0.4.0            # PII protection
+
+# ─── Configuration & Utilities ───
+PyYAML>=6.0.1
+python-dotenv>=1.0.0
+tqdm>=4.66.0
+pandas>=2.1.0
+scikit-learn>=1.3.0
+
+# ─── Testing ───
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# ─── Monitoring ───
+wandb>=0.16.0                   # Weights & Biases
+prometheus-client>=0.19.0
+
+# ─── Deployment ───
+onnx>=1.15.0
+onnxruntime>=1.17.0
+reportlab>=4.0.0                # PDF report generation
+
+# ─── Workflow Automation ───
+# n8n is Node.js-based, installed separately via Docker
+# Docker + Kubernetes configs are in k8s/ and docker-compose.yml
