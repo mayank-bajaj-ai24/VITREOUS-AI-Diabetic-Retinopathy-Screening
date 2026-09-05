@@ -9,65 +9,65 @@
 
 ## 1. Quality Gate — `src/quality/quality_gate.py` (Phase 1)
 
-- [ ] Create `src/quality/` directory and `__init__.py`
-- [ ] Implement **Laplacian Blur-Variance Check** (Focus)
-  - [ ] Compute Laplacian variance on grayscale fundus image
-  - [ ] Tenengrad gradient magnitude as secondary sharpness metric
-  - [ ] Combined focus score with configurable weighting
-  - [ ] Threshold classification → `FAIL_BLUR` if below threshold
-- [ ] Implement **Histogram/Intensity Exposure Check** (Illumination)
-  - [ ] Mean intensity analysis (over-exposure / under-exposure detection)
-  - [ ] Histogram distribution analysis (uniformity check)
-  - [ ] Per-channel brightness variance detection
-  - [ ] Threshold classification → `FAIL_UNDEREXPOSED` or `FAIL_OVEREXPOSED`
-- [ ] Implement **FOV Mask Coverage Check** (Field of View)
-  - [ ] Otsu thresholding to extract circular fundus mask
-  - [ ] Hough Circle Transform for FOV boundary detection
-  - [ ] FOV completeness percentage calculation
-  - [ ] Retina centering assessment (centroid offset from image center)
-  - [ ] Threshold classification → `FAIL_FOV` if below coverage threshold
-- [ ] Implement **Overall Quality Decision Logic**
-  - [ ] Binary pass/fail decision gate
-  - [ ] Return structured result: `{pass: bool, scores: {blur, exposure, fov}, fail_codes: [...]}`
-  - [ ] Pass → route to Adaptive Enhancement (Phase 2)
-  - [ ] Fail → route to Recapture Alert
-  - [ ] Logging of quality assessment results per image
+- [x] Create `src/quality/` directory and `__init__.py`
+- [x] Implement **Laplacian Blur-Variance Check** (Focus)
+  - [x] Compute Laplacian variance on grayscale fundus image
+  - [x] Tenengrad gradient magnitude as secondary sharpness metric
+  - [x] Combined focus score with configurable weighting
+  - [x] Threshold classification → `FAIL_BLUR` if below threshold
+- [x] Implement **Histogram/Intensity Exposure Check** (Illumination)
+  - [x] Mean intensity analysis (over-exposure / under-exposure detection)
+  - [x] Histogram distribution analysis (uniformity check)
+  - [x] Per-channel brightness variance detection
+  - [x] Threshold classification → `FAIL_UNDEREXPOSED` or `FAIL_OVEREXPOSED`
+- [x] Implement **FOV Mask Coverage Check** (Field of View)
+  - [x] Otsu thresholding to extract circular fundus mask
+  - [x] Hough Circle Transform for FOV boundary detection
+  - [x] FOV completeness percentage calculation
+  - [x] Retina centering assessment (centroid offset from image center)
+  - [x] Threshold classification → `FAIL_FOV` if below coverage threshold
+- [x] Implement **Overall Quality Decision Logic**
+  - [x] Binary pass/fail decision gate
+  - [x] Return structured result: `{pass: bool, scores: {blur, exposure, fov}, fail_codes: [...]}`
+  - [x] Pass → route to Adaptive Enhancement (Phase 2)
+  - [x] Fail → route to Recapture Alert
+  - [x] Logging of quality assessment results per image
 
 ---
 
 ## 2. Recapture Alert — `src/quality/recapture_alert.py` (Phase 1)
 
-- [ ] Implement **Fail Code → Feedback Mapping**
-  - [ ] `FAIL_BLUR` → "Hold camera steady and refocus"
-  - [ ] `FAIL_UNDEREXPOSED` → "Increase illumination or flash intensity"
-  - [ ] `FAIL_OVEREXPOSED` → "Reduce illumination"
-  - [ ] `FAIL_FOV` → "Recenter the retina in the frame"
-  - [ ] Multiple failures → prioritized list of actionable instructions
-- [ ] Implement **Structured Output**
-  - [ ] JSON output with reason codes + human-readable messages
-  - [ ] Severity ranking when multiple metrics fail (most critical first)
-- [ ] Implement **Rejection Logging**
-  - [ ] Log rejection event (timestamp, image ID, per-metric scores, fail codes)
-  - [ ] Track recapture attempt count per patient/session
+- [x] Implement **Fail Code → Feedback Mapping**
+  - [x] `FAIL_BLUR` → "Hold camera steady and refocus"
+  - [x] `FAIL_UNDEREXPOSED` → "Increase illumination or flash intensity"
+  - [x] `FAIL_OVEREXPOSED` → "Reduce illumination"
+  - [x] `FAIL_FOV` → "Recenter the retina in the frame"
+  - [x] Multiple failures → prioritized list of actionable instructions
+- [x] Implement **Structured Output**
+  - [x] JSON output with reason codes + human-readable messages
+  - [x] Severity ranking when multiple metrics fail (most critical first)
+- [x] Implement **Rejection Logging**
+  - [x] Log rejection event (timestamp, image ID, per-metric scores, fail codes)
+  - [x] Track recapture attempt count per patient/session
 
 ---
 
 ## 3. Synthetic Degradation Validation — `src/quality/synthetic_degradation.py` (Phase 1)
 
-- [ ] Implement **Synthetic Blur Generator**
-  - [ ] Gaussian blur at varying kernel sizes (3×3, 7×7, 15×15, 31×31)
-  - [ ] Motion blur simulation
-- [ ] Implement **Brightness Manipulation**
-  - [ ] Gamma correction for under-exposure (gamma > 1)
-  - [ ] Gamma correction for over-exposure (gamma < 1)
-  - [ ] Additive brightness shifts
-- [ ] Implement **FOV Cropping Simulator**
-  - [ ] Partial FOV by cropping circular mask edges
-  - [ ] Off-center FOV by shifting the fundus disc
-- [ ] Create **Validation Dataset**
-  - [ ] Take 5–10 known good fundus images
-  - [ ] Generate degraded variants for each failure mode
-  - [ ] Verify quality gate catches every degraded variant correctly
+- [x] Implement **Synthetic Blur Generator**
+  - [x] Gaussian blur at varying kernel sizes (3×3, 7×7, 15×15, 31×31)
+  - [x] Motion blur simulation
+- [x] Implement **Brightness Manipulation**
+  - [x] Gamma correction for under-exposure (gamma > 1)
+  - [x] Gamma correction for over-exposure (gamma < 1)
+  - [x] Additive brightness shifts
+- [x] Implement **FOV Cropping Simulator**
+  - [x] Partial FOV by cropping circular mask edges
+  - [x] Off-center FOV by shifting the fundus disc
+- [x] Create **Validation Dataset**
+  - [x] Take 5–10 known good fundus images
+  - [x] Generate degraded variants for each failure mode
+  - [x] Verify quality gate catches every degraded variant correctly
 
 ---
 
