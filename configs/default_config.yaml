@@ -8,8 +8,8 @@
 # ─── Quality Gate Thresholds (Phase 1) ───
 quality_gate:
   blur:
-    laplacian_variance_min: 100.0     # Below this → FAIL_BLUR
-    tenengrad_min: 50.0               # Secondary sharpness check
+    laplacian_variance_min: 3.0       # Below this → FAIL_BLUR (Adjusted for typical fundus)
+    tenengrad_min: 10.0               # Secondary sharpness check
     weight_laplacian: 0.7             # Blend weight for combined score
     weight_tenengrad: 0.3
 
