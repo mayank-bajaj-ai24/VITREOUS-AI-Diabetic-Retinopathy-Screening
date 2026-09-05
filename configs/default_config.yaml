@@ -1,0 +1,110 @@
+# ═══════════════════════════════════════════════════════
+# NETRA — Default Configuration
+# ═══════════════════════════════════════════════════════
+# All thresholds and parameters are tunable.
+# Quality Gate reads these at runtime.
+# ═══════════════════════════════════════════════════════
+
+# ─── Quality Gate Thresholds (Phase 1) ───
+quality_gate:
+  blur:
+    laplacian_variance_min: 100.0     # Below this → FAIL_BLUR
+    tenengrad_min: 50.0               # Secondary sharpness check
+    weight_laplacian: 0.7             # Blend weight for combined score
+    weight_tenengrad: 0.3
+
+  exposure:
+    brightness_min: 40                # Below this → FAIL_UNDEREXPOSED (0-255 scale)
+    brightness_max: 220               # Above this → FAIL_OVEREXPOSED
+    histogram_uniformity_min: 0.3     # Minimum histogram spread
+
+  fov:
+    coverage_min: 0.70                # 70% FOV coverage required
+    centering_max_offset: 0.15        # Max centroid offset from center (fraction of image)
+
+# ─── Enhancement Parameters (Phase 2) ───
+enhancement:
+  target_size: 512                    # Output: 512×512
+  normalization_mode: "float01"       # "float01" (0.0–1.0) or "uint8" (0–255)
+
+  # Quality-Adaptive Profiles
+  profiles:
+    low:                              # Good quality images — minimal enhancement
+      clahe_clip_limit: 1.5
+      clahe_tile_grid: 8
+      nlm_filter_strength: 5
+      nlm_template_window: 7
+      nlm_search_window: 21
+
+    medium:                           # Borderline images — moderate enhancement
+      clahe_clip_limit: 2.5
+      clahe_tile_grid: 8
+      nlm_filter_strength: 8
+      nlm_template_window: 7
+      nlm_search_window: 21
+
+    high:                             # Near-threshold images — aggressive enhancement
+      clahe_clip_limit: 4.0
+      clahe_tile_grid: 8
+      nlm_filter_strength: 12
+      nlm_template_window: 7
+      nlm_search_window: 21
+
+  # Profile selection thresholds (based on quality gate scores)
+  profile_selection:
+    high_threshold: 0.5               # Below this quality score → high enhancement
+    medium_threshold: 0.7             # Below this → medium enhancement
+    # Above medium_threshold → low enhancement
+
+# ─── Model Architecture (Phase 3) ───
+models:
+  segmentation:
+    backbone: "resnet34"              # UNet++ encoder backbone
+    num_classes: 3                    # Microaneurysms, Hemorrhages, Exudates
+    input_size: 512
+
+  grading:
+    efficientnet_features: 1792       # EfficientNet-B4 output dim
+    resnet_features: 2048             # ResNet-50 output dim
+    fused_features: 3840              # Concatenated
+    dense1_units: 512
+    dense1_dropout: 0.5
+    dense2_units: 128
+    dense2_dropout: 0.3
+    num_classes: 5                    # ICDR Levels 0–4
+
+# ─── Training (Phase 3) ───
+training:
+  batch_size: 16
+  learning_rate: 0.0001
+  epochs: 50
+  patience: 10                        # Early stopping patience
+  split_ratio: [0.70, 0.15, 0.15]    # Train / Val / Test
+
+# ─── Dataset Paths ───
+datasets:
+  aptos: "data/datasets/aptos/"
+  idrid: "data/datasets/idrid/"
+  fgadr: "data/datasets/fgadr/"
+  ddr: "data/datasets/ddr/"
+  eyepacs: "data/datasets/eyepacs/"
+  messidor2: "data/datasets/messidor2/"
+
+# ─── Calibration (Phase 3 — XAI) ───
+calibration:
+  initial_temperature: 1.5            # Temperature scaling starting point
+  max_iterations: 100                 # Optimization iterations
+
+# ─── Target Metrics ───
+targets:
+  qwk: 0.88
+  sensitivity: 0.90
+  workload_reduction: 0.80
+  screening_time_seconds: 120
+
+# ─── Logging ───
+logging:
+  level: "INFO"
+  log_dir: "logs/"
+  save_quality_results: true
+  save_enhancement_metadata: true
