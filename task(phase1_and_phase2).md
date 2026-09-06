@@ -158,7 +158,32 @@
   - [ ] 2–3 poor quality images (should fail — blurred, dark, overexposed)
   - [ ] 1–2 borderline quality images
 - [ ] Create `data/sample_images/` directory with test images
-- [ ] Create utility script to visualize:
-  - [ ] Quality gate scores (bar chart per metric)
-  - [ ] Enhancement before/after comparison (side-by-side)
-  - [ ] Histogram comparison pre/post CLAHE
+- [x] Create utility script to visualize:
+  - [x] Quality gate scores (bar chart per metric)
+  - [x] Enhancement before/after comparison (side-by-side)
+  - [x] Histogram comparison pre/post CLAHE
+
+---
+
+## 8. MATLAB End-to-End Pipeline — `matlab/` (Phase 1 + Phase 2)
+
+- [x] Create MATLAB project architecture directory `matlab/`
+- [x] Implement YAML config loader in MATLAB: `matlab/config/load_config.m`
+- [x] Implement Quality Gate module in MATLAB:
+  - [x] `check_focus.m` (Laplacian variance + Tenengrad)
+  - [x] `check_exposure.m` (Mean brightness + Shannon Entropy)
+  - [x] `check_fov.m` (Otsu thresholding + centroid alignment)
+  - [x] `recapture_alert.m` (Clinical operator feedback system)
+  - [x] `quality_gate.m` (Phase 1 master orchestrator)
+- [x] Implement Adaptive Enhancement module in MATLAB:
+  - [x] `crop_fundus_roi.m` (Otsu ROI cropping)
+  - [x] `apply_clahe.m` (Green-channel and LAB CLAHE contrast enhancement)
+  - [x] `apply_nlm_denoising.m` (Non-local means denoising via `imnlmfilt`)
+  - [x] `standardize_image.m` (Aspect-ratio preserving letterbox resize to 512x512)
+  - [x] `estimate_noise.m` (MAD Laplacian noise estimation)
+  - [x] `select_profile.m` (Dynamic 3-factor quality composite scoring)
+  - [x] `compute_metrics.m` (Contrast, SNR, sharpness evaluation)
+  - [x] `enhance_fundus.m` (Phase 2 master orchestrator)
+- [x] Implement MATLAB Demo script: `matlab/demo/run_pipeline_demo.m`
+- [x] Implement MATLAB Unit Tests: `matlab/tests/test_quality_gate.m` and `matlab/tests/test_enhancement.m`
+

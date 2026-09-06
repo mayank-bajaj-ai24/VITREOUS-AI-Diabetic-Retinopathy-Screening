@@ -1,91 +1,81 @@
 # NETRA — National Eye Triage & Retinal Assessment
 
 <p align="center">
-  <img src="app/public/netra_logo.png" alt="NETRA Logo" width="120"/>
+  <strong>MATLAB-Based Explainable AI for Diabetic Retinopathy Screening in Rural India</strong>
 </p>
 
 <p align="center">
-  <strong>Explainable AI for Diabetic Retinopathy Screening in Rural India</strong>
-</p>
-
-<p align="center">
-  SIH 2026 · Problem Statement 26038 · MedTech / HealthTech · Team ByteCrew
+  SIH 2026 · Problem Statement 26038 · MedTech / HealthTech · Team ByteCrew (Team ID 24)
 </p>
 
 ---
 
 ## What is NETRA?
 
-NETRA is a quality-gated, explainable AI Clinical Decision Support System (CDSS) for Diabetic Retinopathy (DR) screening. It grades DR severity (ICDR 0–4) from fundus photographs through a parallel dual-track deep learning pipeline — validated with MATLAB SimEvents simulation to confirm real-world scalability in rural Primary Health Centres.
+NETRA is a quality-gated, explainable AI Clinical Decision Support System (CDSS) for Diabetic Retinopathy (DR) screening. Built as a **100% MATLAB pipeline** for MATLAB R2026a, it grades DR severity (ICDR 0–4) from fundus photographs through a parallel dual-track deep learning pipeline — validated with a MATLAB SimEvents discrete-event simulation to confirm real-world scalability in rural Primary Health Centres (PHCs).
 
-## Pipeline
+## Pipeline Architecture
 
 ```
 Raw Fundus Image
-  → Quality Gate (blur / exposure / FOV checks)
-  → Quality-Adaptive Enhancement (CLAHE, denoising, standardization)
-  → Parallel Dual-Track AI:
+  → MATLAB Quality Gate (blur / exposure / FOV checks)
+  → MATLAB Quality-Adaptive Enhancement (CLAHE, denoising, standardization)
+  → Parallel Dual-Track MATLAB AI:
        Track A: UNet++ Lesion Segmentation
        Track B: EfficientNet-B4 + ResNet-50 Hybrid Grading
-  → XAI & Calibration (Grad-CAM, Temperature Scaling)
-  → Clinical Decision Support → Report
+  → MATLAB XAI & Calibration (gradcam(), Temperature Scaling)
+  → Clinical Decision Support → PDF Report
 ```
 
-## Tech Stack
+## Tech Stack & MATLAB Toolboxes
 
-| Layer | Technologies |
+| Layer | Toolboxes & Technologies |
 |---|---|
-| **AI Core** | PyTorch, OpenCV, segmentation-models-pytorch |
-| **Backend** | FastAPI, PostgreSQL, MongoDB, Redis, Amazon S3 |
-| **LLM Agents** | LangChain, LangGraph, LlamaIndex |
-| **Vector/Graph DB** | Pinecone, Neo4j |
-| **Safety** | NeMo Guardrails, Guardrails AI |
-| **Frontend** | ReactJS |
-| **Monitoring** | LangSmith, Weights & Biases, Prometheus |
-| **Deployment** | Docker, Kubernetes, ONNX Runtime |
+| **Core Platform** | MATLAB R2026a |
+| **Image Processing** | Image Processing Toolbox (`adapthisteq`, `imnlmfilt`, `imbinarize`, `regionprops`) |
+| **Deep Learning** | Deep Learning Toolbox (`trainNetwork`, `semanticseg`, `gradcam`, `importONNXNetwork`) |
+| **Statistics** | Statistics and Machine Learning Toolbox (`var`, `median`, `entropy`) |
+| **Simulation** | Simulink & SimEvents (Discrete-event clinic workflow simulation) |
+| **UI Application** | MATLAB App Designer (`NETRA_App.mlapp`) |
 
 ## Project Structure
 
 ```
 NETRA/
-├── src/
-│   ├── quality/          # Phase 1-2: Quality Gate + Enhancement
-│   ├── segmentation/     # Phase 3A: UNet++ Lesion Segmentation
-│   ├── models/           # Phase 3B: Hybrid Grading Model
-│   ├── training/         # Training pipelines
-│   ├── explainability/   # XAI: Grad-CAM, SHAP, Calibration
-│   ├── agents/           # LangGraph multi-agent orchestration
-│   ├── reporting/        # Clinical Decision Support + PDF
-│   ├── deployment/       # ONNX export + inference engine
-│   ├── validation/       # External validation (Messidor-2)
-│   └── data/             # Dataset splitting utilities
-├── api/                  # FastAPI backend
-├── app/                  # ReactJS Dashboard
-├── simulink/             # MATLAB SimEvents operational model
-├── configs/              # YAML configurations
-├── tests/                # pytest test suite
-├── data/                 # Datasets & sample images
-└── requirements.txt
+├── matlab/
+│   ├── config/           # YAML config loader (load_config.m) [DONE ✅]
+│   ├── quality/          # Phase 1: Quality Gate Module [DONE ✅]
+│   ├── enhancement/      # Phase 2: Quality-Adaptive Enhancement [DONE ✅]
+│   ├── segmentation/     # Phase 3: Structure & Lesion Segmentation [NEXT ⏳]
+│   ├── classification/   # Phase 4: DR Severity Grading Hybrid Model
+│   ├── explainability/   # Phase 5: Grad-CAM XAI & Calibration
+│   ├── simulink/         # Phase 5: SimEvents Operational Model
+│   ├── app/              # Phase 5: MATLAB App Designer GUI
+│   ├── demo/             # Master Pipeline Demo (run_pipeline_demo.m) [DONE ✅]
+│   └── tests/            # MATLAB Unit Test Suites [DONE ✅]
+├── configs/              # Project YAML configurations
+├── data/                 # Sample images & datasets
+└── python_legacy/        # Archived Python legacy code
 ```
 
-## Quick Start
+## Quick Start (MATLAB R2026a)
 
-```bash
-# Clone
-git clone https://github.com/mayank-bajaj-ai24/NETRA-National-Eye-Triage-Retinal-Assessment.git
-cd NETRA-National-Eye-Triage-Retinal-Assessment
-
-# Python environment
-python -m venv venv
-venv\Scripts\activate        # Windows
-pip install -r requirements.txt
-
-# Run UI (development)
-cd app && npm install && npm run dev
-
-# Run tests
-pytest tests/ -v
-```
+1. Open **MATLAB R2026a**.
+2. Navigate to the project root directory:
+   ```matlab
+   cd('C:\Users\mayan\OneDrive\Desktop\SIH 2.0\NETRA-National-Eye-Triage-Retinal-Assessment')
+   ```
+3. Run the **Master Phase 1 & Phase 2 Pipeline Demo**:
+   ```matlab
+   cd matlab/demo
+   run_pipeline_demo
+   ```
+4. Run automated MATLAB unit tests:
+   ```matlab
+   cd ../tests
+   runtests('test_quality_gate')
+   runtests('test_enhancement')
+   ```
 
 ## Target Metrics
 
