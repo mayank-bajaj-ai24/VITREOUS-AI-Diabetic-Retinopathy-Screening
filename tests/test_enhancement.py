@@ -409,3 +409,120 @@ class TestQualityMetrics:
         metrics = enhancer.compute_quality_metrics(float_img)
         assert metrics['histogram_std'] >= 0
         assert metrics['mean_brightness'] >= 0
+
+
+# Noise Estimation Tests 
+class TestNoiseEstimation:
+    """Tests for the MAD-based noise level estimation."""
+
+    def test_noise_returns_float(self, enhancer, sample_image):
+        """Noise estimation should return a positive float."""
+        sigma = enhancer.estimate_noise_level(sample_image)
+        assert isinstance(sigma, float)
+        assert sigma >= 0
+
+    def test_noisy_image_higher_sigma(self, enhancer, sample_image):
+        """Adding Gaussian noise should increase estimated sigma."""
+        baseline = enhancer.estimate_noise_level(sample_image)
+
+        noise = np.random.normal(0, 25, sample_image.shape).astype(np.float32)
+        noisy = np.clip(sample_image.astype(np.float32) + noise, 0, 255).astype(np.uint8)
+        noisy_sigma = enhancer.estimate_noise_level(noisy)
+
+        assert noisy_sigma > baseline
+
+    def test_noise_handles_grayscale(self, enhancer):
+        """Noise estimation should work on grayscale input."""
+        gray = np.random.randint(0, 255, (256, 256), dtype=np.uint8)
+        sigma = enhancer.estimate_noise_level(gray)
+        assert isinstance(sigma, float)
+        assert sigma >= 0
+
+    def test_blank_image_low_noise(self, enhancer):
+        """A uniform (blank) image should have near-zero noise."""
+        blank = np.ones((256, 256, 3), dtype=np.uint8) * 128
+        sigma = enhancer.estimate_noise_level(blank)
+        assert sigma < 1.0
+
+
+# Letterbox Standardization Tests 
+class TestLetterboxResize:
+    """Tests for aspect-ratio-preserving letterbox resize."""
+
+    def test_non_square_image_preserved(self, enhancer):
+        """A wide image should be letterboxed with black bars top/bottom."""
+        wide = np.ones((200, 400, 3), dtype=np.uint8) * 128
+        result = enhancer.standardize(wide, target_size=512, normalization_mode='uint8')
+        assert result.shape == (512, 512, 3)
+
+        # Top/bottom edges should be black (letterbox padding)
+        assert result[0, 256, 0] == 0, "Top edge should be black (letterbox)"
+        assert result[-1, 256, 0] == 0, "Bottom edge should be black (letterbox)"
+
+    def test_tall_image_preserved(self, enhancer):
+        """A tall image should be letterboxed with black bars left/right."""
+        tall = np.ones((400, 200, 3), dtype=np.uint8) * 128
+        result = enhancer.standardize(tall, target_size=512, normalization_mode='uint8')
+        assert result.shape == (512, 512, 3)
+
+        # Left/right edges should be black (letterbox padding)
+        assert result[256, 0, 0] == 0, "Left edge should be black (letterbox)"
+        assert result[256, -1, 0] == 0, "Right edge should be black (letterbox)"
+
+    def test_square_image_no_padding(self, enhancer):
+        """A square image should fill the canvas completely (no padding)."""
+        square = np.ones((300, 300, 3), dtype=np.uint8) * 128
+        result = enhancer.standardize(square, target_size=512, normalization_mode='uint8')
+        assert result.shape == (512, 512, 3)
+        # Center pixel should not be black
+        assert result[256, 256, 0] > 0
+
+
+# LAB CLAHE Tests 
+class TestLABCLAHE:
+    """Tests for the LAB color space CLAHE mode."""
+
+    def test_lab_clahe_preserves_shape(self, enhancer, sample_image):
+        """LAB CLAHE output shape should match input shape."""
+        result = enhancer.apply_lab_clahe(sample_image, clip_limit=2.5, tile_grid_size=8)
+        assert result.shape == sample_image.shape
+
+    def test_lab_clahe_preserves_dtype(self, enhancer, sample_image):
+        """LAB CLAHE output should remain uint8."""
+        result = enhancer.apply_lab_clahe(sample_image, clip_limit=2.5, tile_grid_size=8)
+        assert result.dtype == np.uint8
+
+    def test_lab_clahe_changes_image(self, enhancer, sample_image):
+        """LAB CLAHE should modify the image (not no-op)."""
+        result = enhancer.apply_lab_clahe(sample_image, clip_limit=2.5, tile_grid_size=8)
+        assert not np.array_equal(result, sample_image)
+
+
+# Pipeline Metadata Tests 
+class TestMergedPipelineMetadata:
+    """Tests for merged metadata fields (noise_level, clahe_mode)."""
+
+    def test_metadata_contains_noise_level(self, enhancer, sample_image):
+        """Pipeline metadata should include noise_level."""
+        _, metadata = enhancer.enhance(sample_image)
+        assert 'noise_level' in metadata
+        assert isinstance(metadata['noise_level'], float)
+        assert metadata['noise_level'] >= 0
+
+    def test_metadata_contains_clahe_mode(self, enhancer, sample_image):
+        """Pipeline metadata should include clahe_mode."""
+        _, metadata = enhancer.enhance(sample_image)
+        assert 'clahe_mode' in metadata
+        assert metadata['clahe_mode'] in ('green', 'lab')
+
+    def test_lab_mode_pipeline(self, sample_image, config):
+        """Pipeline with LAB CLAHE mode should work end-to-end."""
+        lab_config = config.copy()
+        lab_config['enhancement'] = config.get('enhancement', {}).copy()
+        lab_config['enhancement']['clahe_mode'] = 'lab'
+        lab_enhancer = FundusEnhancer(config_dict=lab_config)
+
+        enhanced, metadata = lab_enhancer.enhance(sample_image)
+        assert enhanced.shape == (512, 512, 3)
+        assert metadata['clahe_mode'] == 'lab'
+

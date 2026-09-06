@@ -26,6 +26,8 @@ quality_gate:
 enhancement:
   target_size: 512                    # Output: 512×512
   normalization_mode: "float01"       # "float01" (0.0–1.0) or "uint8" (0–255)
+  clahe_mode: "green"                 # "green" (vascular contrast) or "lab" (color-preserving)
+  crop_margin_pct: 0.02               # Safety margin around ROI bounding box (fraction)
 
   # Quality-Adaptive Profiles
   profiles:

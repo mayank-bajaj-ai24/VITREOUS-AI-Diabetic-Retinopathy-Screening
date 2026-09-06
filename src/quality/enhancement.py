@@ -30,6 +30,8 @@ class FundusEnhancer:
         self.config = config_dict.get('enhancement', {})
         self.target_size = self.config.get('target_size', 512)
         self.normalization_mode = self.config.get('normalization_mode', 'float01')
+        self.clahe_mode = self.config.get('clahe_mode', 'green')
+        self.crop_margin_pct = self.config.get('crop_margin_pct', 0.02)
         self.profiles = self.config.get('profiles', {})
         self.profile_selection = self.config.get('profile_selection', {})
 
@@ -83,9 +85,9 @@ class FundusEnhancer:
         w = stats[largest_idx, cv2.CC_STAT_WIDTH]
         h = stats[largest_idx, cv2.CC_STAT_HEIGHT]
 
-        # Add a small margin (2% of each dimension) to avoid cutting edges
-        margin_x = max(int(w * 0.02), 1)
-        margin_y = max(int(h * 0.02), 1)
+        # Add a configurable margin to avoid cutting edges
+        margin_x = max(int(w * self.crop_margin_pct), 1)
+        margin_y = max(int(h * self.crop_margin_pct), 1)
 
         x_start = max(x - margin_x, 0)
         y_start = max(y - margin_y, 0)
@@ -186,6 +188,34 @@ class FundusEnhancer:
         )
         return enhanced
 
+    # Noise Estimation (MAD-based)
+    @staticmethod
+    def estimate_noise_level(image: np.ndarray) -> float:
+        """
+        Estimate image noise level (sigma) using Median Absolute Deviation
+        of the high-frequency Laplacian response.
+
+        This is a robust noise estimator that is less affected by image
+        content (edges, textures) than simple variance methods.
+
+        Args:
+            image: Input image (BGR or grayscale, uint8).
+
+        Returns:
+            Estimated noise standard deviation (sigma).
+        """
+        if image.ndim == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image.copy()
+
+        lap = cv2.Laplacian(gray, cv2.CV_64F)
+        # MAD estimator: sigma = median(|lap - median(lap)|) / 0.6745
+        median_val = np.median(lap)
+        mad = np.median(np.abs(lap - median_val))
+        sigma = float(mad / 0.6745)
+        return sigma
+
     # Step 3: Non-Local Means Denoising
     
     def apply_nlm_denoising(
@@ -212,6 +242,16 @@ class FundusEnhancer:
         Returns:
             Denoised BGR image.
         """
+        # Enforce odd window sizes (OpenCV requirement)
+        if template_window_size % 2 == 0:
+            template_window_size += 1
+        if search_window_size % 2 == 0:
+            search_window_size += 1
+
+        # Auto-convert float to uint8 if needed
+        if image.dtype != np.uint8:
+            image = np.clip(image * 255 if image.max() <= 1.0 else image, 0, 255).astype(np.uint8)
+
         # Use positional args for cross-version OpenCV compatibility
         # Signature: src, dst, h, hForColorComponents, templateWindowSize, searchWindowSize
         denoised = cv2.fastNlMeansDenoisingColored(
@@ -251,22 +291,34 @@ class FundusEnhancer:
         size = target_size if target_size is not None else self.target_size
         mode = normalization_mode if normalization_mode is not None else self.normalization_mode
 
-        # Resize using INTER_AREA for downscaling (anti-aliasing),
-        # INTER_LINEAR for upscaling (smooth interpolation)
         h, w = image.shape[:2]
-        if h > size or w > size:
-            interpolation = cv2.INTER_AREA
-        else:
-            interpolation = cv2.INTER_LINEAR
 
-        resized = cv2.resize(image, (size, size), interpolation=interpolation)
+        # Letterbox resize: preserve aspect ratio and pad with black
+        # This avoids stretching the circular fundus into an oval
+        scale = min(size / w, size / h)
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+
+        # Choose interpolation based on scaling direction
+        if scale < 1.0:
+            interpolation = cv2.INTER_AREA      # anti-aliased downscale
+        else:
+            interpolation = cv2.INTER_CUBIC     # smooth upscale
+
+        resized = cv2.resize(image, (new_w, new_h), interpolation=interpolation)
+
+        # Create black canvas and center the resized image
+        canvas = np.zeros((size, size, 3), dtype=image.dtype)
+        x_offset = (size - new_w) // 2
+        y_offset = (size - new_h) // 2
+        canvas[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized
 
         # Normalize
         if mode == 'float01':
-            standardized = resized.astype(np.float32) / 255.0
+            standardized = canvas.astype(np.float32) / 255.0
         else:
             # Ensure uint8
-            standardized = resized.astype(np.uint8)
+            standardized = canvas.astype(np.uint8)
 
         logger.debug(
             f"Standardized: {image.shape} → {standardized.shape}, mode={mode}"
@@ -304,7 +356,7 @@ class FundusEnhancer:
             Profile name: 'low', 'medium', or 'high'.
         """
         if quality_scores is None:
-            return 'low'
+            return 'low'  # Conservative default — assumes good quality
 
         metrics = quality_scores.get('metrics', {})
 
@@ -330,6 +382,13 @@ class FundusEnhancer:
 
         # Composite quality score (weighted average)
         composite = 0.4 * fov_score + 0.35 * focus_score + 0.25 * exposure_score
+
+        # Noise penalty: if image is excessively noisy, push toward
+        # stronger enhancement regardless of other scores
+        if hasattr(self, '_current_noise_level') and self._current_noise_level is not None:
+            if self._current_noise_level > 12.0:
+                composite *= 0.8
+                logger.debug(f"Noise penalty applied: sigma={self._current_noise_level:.1f} > 12")
 
         # Map composite to profile using config thresholds
         high_threshold = self.profile_selection.get('high_threshold', 0.5)
@@ -464,24 +523,36 @@ class FundusEnhancer:
         metrics_before = self.compute_quality_metrics(image)
         original_shape = image.shape[:2]
 
-        # 1. Select enhancement profile
+        # 1. ROI Crop (before noise estimation so we measure the actual fundus)
+        cropped = self.crop_roi(image)
+        cropped_shape = cropped.shape[:2]
+
+        # 2. Estimate noise level (used by profile selection for noise penalty)
+        noise_level = self.estimate_noise_level(cropped)
+        self._current_noise_level = noise_level
+        logger.debug(f"Estimated noise sigma: {noise_level:.2f}")
+
+        # 3. Select enhancement profile (noise-aware via _current_noise_level)
         profile_name = self.select_enhancement_profile(quality_scores)
         params = self._get_profile_params(profile_name)
 
         logger.info(
             f"Enhancement pipeline starting: profile='{profile_name}', "
-            f"input_shape={image.shape[:2]}"
+            f"input_shape={image.shape[:2]}, noise_sigma={noise_level:.2f}"
         )
 
-        # 2. ROI Crop
-        cropped = self.crop_roi(image)
-        cropped_shape = cropped.shape[:2]
-
-        # 3. Green-Channel CLAHE
-        clahe_enhanced = self.apply_green_clahe(
-            cropped,
-            clip_limit=params['clahe_clip_limit'],
-            tile_grid_size=params['clahe_tile_grid']
+        # 3. CLAHE (mode selected via config: 'green' or 'lab')
+        if self.clahe_mode == 'lab':
+            clahe_enhanced = self.apply_lab_clahe(
+                cropped,
+                clip_limit=params['clahe_clip_limit'],
+                tile_grid_size=params['clahe_tile_grid']
+            )
+        else:
+            clahe_enhanced = self.apply_green_clahe(
+                cropped,
+                clip_limit=params['clahe_clip_limit'],
+                tile_grid_size=params['clahe_tile_grid']
         )
 
         # 4. NLM Denoising
@@ -505,6 +576,8 @@ class FundusEnhancer:
             'metrics_after': metrics_after,
             'original_shape': original_shape,
             'cropped_shape': cropped_shape,
+            'noise_level': noise_level,
+            'clahe_mode': self.clahe_mode,
             'target_size': self.target_size,
             'normalization_mode': self.normalization_mode
         }
