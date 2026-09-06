@@ -5,7 +5,7 @@ import {
   Eye, LayoutDashboard, MonitorPlay, MessageSquare, Activity, Settings,
   Bell, Plus, Users, Upload, Wifi, Stethoscope, ArrowRight, ChevronRight,
   HelpCircle, ShieldCheck, Heart, Zap, Brain, FileText, CheckCircle2,
-  Globe, ArrowUpRight, ChevronDown
+  Globe, ArrowUpRight, ChevronDown, X, AlertTriangle, RefreshCw, Sparkles
 } from 'lucide-react';
 
 /* ─── Intersection Observer Hook ─── */
@@ -339,8 +339,235 @@ function Landing({ onLogin }) {
   );
 }
 
+/* ═════════════════════ SCREENING MODAL (PHASE 1 & 2 DEMO) ═════════════════════ */
+function ScreeningModal({ isOpen, onClose }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const fileInputRef = useRef(null);
+
+  if (!isOpen) return null;
+
+  const handleFileSelect = (e) => {
+    const selected = e.target.files?.[0];
+    if (selected) {
+      setFile(selected);
+      setPreview(URL.createObjectURL(selected));
+      setResult(null);
+      setError(null);
+    }
+  };
+
+  const loadPreset = async (presetUrl, name) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(presetUrl);
+      const blob = await res.blob();
+      const presetFile = new File([blob], name, { type: 'image/png' });
+      setFile(presetFile);
+      setPreview(URL.createObjectURL(presetFile));
+      setResult(null);
+    } catch (err) {
+      setError("Failed to load preset image.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runScreening = async () => {
+    if (!file) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('http://localhost:8000/api/screen', {
+        method: 'POST',
+        body: formData
+      });
+      if (!response.ok) {
+        throw new Error(`Server returned status ${response.status}`);
+      }
+      const data = await response.json();
+      setResult(data);
+    } catch (err) {
+      setError("Could not reach backend API at http://localhost:8000. Start it with: python -m uvicorn src.api.server:app --port 8000");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title-group">
+            <ShieldCheck size={28} color="var(--accent-teal)" />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="modal-title">Live Retinal Screening</div>
+                <span className="modal-badge">Phase 1 & 2 Gate</span>
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                Automated Quality Assessment & Adaptive Enhancement
+              </div>
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div className="modal-body">
+          {/* Preset Buttons */}
+          <div className="preset-section">
+            <span className="preset-label">Quick Test Presets:</span>
+            <button className="preset-btn" onClick={() => loadPreset('/samples/sample_good.png', 'sample_good.png')}>
+              ● Valid Retina (Pass)
+            </button>
+            <button className="preset-btn" onClick={() => loadPreset('/samples/sample_borderline.png', 'sample_borderline.png')}>
+              ● Borderline Retina
+            </button>
+          </div>
+
+          {/* Upload Dropzone */}
+          {!preview ? (
+            <div className="dropzone" onClick={() => fileInputRef.current?.click()}>
+              <div className="dropzone-icon"><Upload size={24} /></div>
+              <div className="dropzone-title">Upload a retinal fundus photograph</div>
+              <div className="dropzone-sub">Click to browse or drag and drop (PNG, JPG, JPEG)</div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleFileSelect}
+              />
+            </div>
+          ) : (
+            <div>
+              {/* Image Previews & Result */}
+              <div className="results-grid">
+                {/* Original Preview */}
+                <div className="image-preview-card">
+                  <div className="image-preview-header">
+                    <span>1. RAW INPUT PHOTOGRAPH</span>
+                    <button
+                      onClick={() => { setFile(null); setPreview(null); setResult(null); }}
+                      style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.75rem' }}
+                    >
+                      Change image
+                    </button>
+                  </div>
+                  <div className="image-preview-frame">
+                    <img src={preview} alt="Raw Fundus" />
+                  </div>
+                </div>
+
+                {/* Enhanced Output Preview */}
+                <div className="image-preview-card">
+                  <div className="image-preview-header">
+                    <span>2. ENHANCED TENSOR (512×512)</span>
+                    {result?.status === 'ACCEPTED' && (
+                      <span style={{ color: '#10b981', fontWeight: 800 }}>READY FOR AI</span>
+                    )}
+                  </div>
+                  <div className="image-preview-frame">
+                    {loading ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', color: '#94a3b8' }}>
+                        <RefreshCw size={28} className="spin-icon" />
+                        <span style={{ fontSize: '0.85rem' }}>Running Quality Gate & Adaptive CLAHE...</span>
+                      </div>
+                    ) : result?.enhanced_image_base64 ? (
+                      <img src={`data:image/jpeg;base64,${result.enhanced_image_base64}`} alt="Enhanced 512x512" />
+                    ) : (
+                      <div style={{ color: '#64748b', fontSize: '0.85rem', textAlign: 'center', padding: '20px' }}>
+                        {result?.status === 'REJECTED' ? 'Processing halted due to Quality Gate rejection.' : 'Click "Run Screening" to process.'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Outcome Banners */}
+              {result && (
+                <div style={{ marginTop: '16px' }}>
+                  {result.status === 'ACCEPTED' ? (
+                    <div className="banner-accepted">
+                      <CheckCircle2 size={32} color="#22c55e" />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '1rem', color: '#4ade80' }}>
+                          Image Approved by Quality Gate (Passed Focus, Exposure & FOV)
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#bbf7d0', marginTop: '2px' }}>
+                          Standardized to 512×512 float32. Adaptive profile: <strong>{result.enhancement_metadata?.profile_used?.toUpperCase()}</strong>.
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="banner-rejected">
+                      <AlertTriangle size={32} color="#ef4444" />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '1rem', color: '#f87171' }}>
+                          Recapture Required: {result.recapture_alert?.primary_action || 'Image failed clinical thresholds.'}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#fca5a5', marginTop: '2px' }}>
+                          Triggered Fail Codes: {result.fail_codes?.join(', ')}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Metrics Pill Grid */}
+                  {result.metrics && (
+                    <div className="metrics-pill-grid">
+                      <div className="metric-pill">
+                        <div className="metric-pill-label">Laplacian Blur</div>
+                        <div className="metric-pill-val">{result.metrics.focus?.laplacian_variance?.toFixed(1)}</div>
+                      </div>
+                      <div className="metric-pill">
+                        <div className="metric-pill-label">Brightness</div>
+                        <div className="metric-pill-val">{result.metrics.exposure?.mean_brightness?.toFixed(1)}</div>
+                      </div>
+                      <div className="metric-pill">
+                        <div className="metric-pill-label">FOV Coverage</div>
+                        <div className="metric-pill-val">{(result.metrics.fov?.coverage * 100)?.toFixed(1)}%</div>
+                      </div>
+                      <div className="metric-pill">
+                        <div className="metric-pill-label">Sensor Noise</div>
+                        <div className="metric-pill-val">{result.enhancement_metadata?.noise_level?.toFixed(2) || 'N/A'}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {error && (
+                <div style={{ padding: '14px 18px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', borderRadius: '10px', color: '#fca5a5', fontSize: '0.85rem', marginTop: '12px' }}>
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button className="preset-btn" onClick={onClose}>Close</button>
+          {preview && (
+            <button className="l-nav-cta" onClick={runScreening} disabled={loading}>
+              {loading ? 'Processing...' : 'Run Quality Gate & Preprocessing'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ═════════════════════ DASHBOARD ═════════════════════ */
 function Dashboard({ onLogout }) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const screenings = [
     { patient: 'Lakshmi Devi', initials: 'LD', id: 'NC-1048', grade: 'Level 3', status: 'Urgent', statusClass: 'status-urgent', confidence: '94%', time: '10 min ago', avatarColor: '' },
     { patient: 'Ramesh Kumar', initials: 'RK', id: 'NC-1047', grade: 'Level 1', status: 'Complete', statusClass: 'status-complete', confidence: '97%', time: '32 min ago', avatarColor: 'green' },
@@ -349,6 +576,7 @@ function Dashboard({ onLogout }) {
 
   return (
     <div className="app-container">
+      <ScreeningModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       <div className="sidebar">
         <div className="sidebar-header" onClick={onLogout} style={{cursor: 'pointer'}} title="Back to landing page">
           <img src={LOGO} alt="NETRA" className="sidebar-logo-img" /><span>NETRA</span>
@@ -383,7 +611,9 @@ function Dashboard({ onLogout }) {
           </div>
           <div className="actions">
             <button className="btn-icon"><Bell size={20} /></button>
-            <button className="btn-primary"><Plus size={20} />New screening</button>
+            <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+              <Plus size={20} />New screening
+            </button>
           </div>
         </div>
         <div className="dashboard-content">
