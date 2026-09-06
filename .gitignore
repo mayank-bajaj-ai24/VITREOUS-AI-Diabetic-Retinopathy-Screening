@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# NETRA: generated demo output
+data/sample_images/segmentation_output/

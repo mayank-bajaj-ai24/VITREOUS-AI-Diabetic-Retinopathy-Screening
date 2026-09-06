@@ -58,12 +58,50 @@ enhancement:
     medium_threshold: 0.7             # Below this → medium enhancement
     # Above medium_threshold → low enhancement
 
+# ─── Segmentation (Phase 3) ───
+# The segmentation track runs at a larger canvas than the grading track.
+# A microaneurysm is roughly 20-30 px across in a native fundus capture; at the
+# 512 grading canvas that shrinks to about 4 px, which no encoder-decoder can
+# recover after its first pooling stage. Segmentation therefore standardises to
+# 1024 and is fed to the network as overlapping 512 tiles.
+segmentation:
+  input_size: 1024                    # Canvas for the segmentation track
+  tile_size: 512                      # Patch actually fed to UNet++
+  tile_overlap: 128                   # Overlap between adjacent tiles
+  num_classes: 5                      # background + MA + HE + EX + SE
+
+  # Vessel extraction. Calibres are fractions of field-of-view diameter, not
+  # pixels, so the same values hold at 512 and at 1024.
+  vessels:
+    calibre_min_pct: 0.0025           # Fine arterioles
+    calibre_max_pct: 0.0140           # Major arcade veins
+    num_scales: 6                     # Frangi scales across that range
+    structure_sensitivity: 0.25       # Fraction of max response
+    seed_percentile: 98.5             # Hysteresis: confident vessel seeds
+    grow_percentile: 92.0             # Hysteresis: weak continuation
+    min_object_area_pct: 2.0e-5       # Speckle removal, fraction of canvas
+    fov_erode_pct: 0.015              # Keeps Frangi off the aperture rim
+
+  # Optic disc and fovea localisation.
+  optic_disc:
+    radius_min_pct: 0.050             # Disc radius as fraction of FOV diameter
+    radius_max_pct: 0.120
+    disc_diameter_pct: 0.143          # Typical disc diameter (~1/7 of fundus)
+    hough_sensitivity: 0.95
+    refine_percentile: 90             # Boundary threshold within local ROI
+    exclusion_margin: 1.30            # Exudate false-positive exclusion zone
+    fovea_distance_dd: 2.5            # Fovea offset in disc diameters
+    fovea_band_dd: 1.0                # Tolerance on that distance
+    vessel_weight: 0.35               # Weight of vessel convergence cue
+    fovea_vessel_weight: 0.45         # Weight of the avascular-zone cue
+    fovea_prior_weight: 0.25          # Weight of the distance prior
+
 # ─── Model Architecture (Phase 3) ───
 models:
   segmentation:
-    backbone: "resnet34"              # UNet++ encoder backbone
-    num_classes: 3                    # Microaneurysms, Hemorrhages, Exudates
-    input_size: 512
+    backbone: "unetpp"                # Nested UNet++ built via layerGraph
+    num_classes: 5                    # background + MA + HE + EX + SE
+    input_size: 512                   # Tile size; canvas is segmentation.input_size
 
   grading:
     efficientnet_features: 1792       # EfficientNet-B4 output dim
