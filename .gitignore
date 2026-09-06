@@ -216,3 +216,38 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ═══════════════════════════════════════════════════════
+# NETRA — Project Specific Exclusions
+# ═══════════════════════════════════════════════════════
+
+# Datasets & Processed Output Artifacts
+data/processed/
+data/raw/
+data/datasets/
+data/sample_images/user_test_*
+
+# Model Weights, Checkpoints & Serialization
+*.pth
+*.pt
+*.onnx
+*.safetensors
+*.bin
+*.h5
+checkpoints/
+models/weights/
+
+# Training Logs & Experiment Tracking
+logs/
+runs/
+wandb/
+lightning_logs/
+
+# Frontend Build & Caches
+app/dist/
+app/.vite/
+
+# Credentials & API Keys
+kaggle.json
+*.key
+*.pem
