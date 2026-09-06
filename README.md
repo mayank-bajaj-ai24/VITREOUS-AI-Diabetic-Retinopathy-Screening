@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app/public/netra_logo.png" alt="NETRA Logo" width="140"/>
+</p>
+
 # NETRA — National Eye Triage & Retinal Assessment
 
 <p align="center">
