@@ -73,31 +73,32 @@
 
 ## 4. Quality-Adaptive Enhancement — `src/quality/enhancement.py` (Phase 2)
 
-- [ ] Implement **Otsu-Threshold ROI Cropping**
-  - [ ] Convert to grayscale → Otsu binary threshold
-  - [ ] Extract largest connected component (fundus disc)
-  - [ ] Compute bounding box → crop
-  - [ ] Handle edge case: multiple bright regions
-- [ ] Implement **Green-Channel CLAHE**
-  - [ ] Extract green channel (best vascular/lesion contrast for fundus images)
-  - [ ] Apply CLAHE with configurable clip limit (default: 2.0) and tile grid size (default: 8×8)
-  - [ ] Multi-channel CLAHE variant on LAB color space for color-preserved output
-- [ ] Implement **Non-Local Means (NLM) Denoising**
-  - [ ] NLM denoising with configurable filter strength (h parameter)
-  - [ ] Noise level estimator to auto-select denoising strength
-  - [ ] Edge preservation validation (no critical feature smearing)
-- [ ] Implement **Standardization to 512×512**
-  - [ ] Resize with aspect ratio preservation + padding, or direct resize
-  - [ ] Pixel value normalization (0–1 float or 0–255 uint8, configurable)
-  - [ ] Output format: NumPy array ready for PyTorch tensor conversion
-- [ ] Implement **Quality-Adaptive Parameter Selection**
-  - [ ] Define `low`, `medium`, and `high` enhancement profiles
-  - [ ] Map quality gate scores to the appropriate profile (borderline images get stronger enhancement)
-- [ ] Implement **Full Enhancement Pipeline Orchestrator**
-  - [ ] Sequential chain: ROI Crop → Green-Channel CLAHE → NLM Denoise → Standardize
-  - [ ] Before/after quality metric comparison
-  - [ ] Save enhanced image with enhancement metadata (parameters used, scores)
-  - [ ] Output must be ready for both downstream tracks (512×512×3 NumPy array)
+- [x] Implement **Otsu-Threshold ROI Cropping**
+  - [x] Convert to grayscale → Otsu binary threshold
+  - [x] Extract largest connected component (fundus disc)
+  - [x] Compute bounding box → crop
+  - [x] Handle edge case: multiple bright regions
+- [x] Implement **Green-Channel CLAHE**
+  - [x] Extract green channel (best vascular/lesion contrast for fundus images)
+  - [x] Apply CLAHE with configurable clip limit (default: 2.0) and tile grid size (default: 8×8)
+  - [x] Multi-channel CLAHE variant on LAB color space for color-preserved output
+- [x] Implement **Non-Local Means (NLM) Denoising**
+  - [x] NLM denoising with configurable filter strength (h parameter)
+  - [x] Noise level estimator to auto-select denoising strength
+  - [x] Edge preservation validation (no critical feature smearing)
+- [x] Implement **Standardization to 512×512**
+  - [x] Resize with aspect ratio preservation + padding, or direct resize
+  - [x] Pixel value normalization (0–1 float or 0–255 uint8, configurable)
+  - [x] Output format: NumPy array ready for PyTorch tensor conversion
+- [x] Implement **Quality-Adaptive Parameter Selection**
+  - [x] Define `low`, `medium`, and `high` enhancement profiles
+  - [x] Map quality gate scores to the appropriate profile (borderline images get stronger enhancement)
+- [x] Implement **Full Enhancement Pipeline Orchestrator**
+  - [x] Sequential chain: ROI Crop → Green-Channel CLAHE → NLM Denoise → Standardize
+  - [x] Before/after quality metric comparison
+  - [x] Save enhanced image with enhancement metadata (parameters used, scores)
+  - [x] Output must be ready for both downstream tracks (512×512×3 NumPy array)
+
 
 ---
 
