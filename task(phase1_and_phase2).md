@@ -73,91 +73,91 @@
 
 ## 4. Quality-Adaptive Enhancement — `src/quality/enhancement.py` (Phase 2)
 
-- [ ] Implement **Otsu-Threshold ROI Cropping**
-  - [ ] Convert to grayscale → Otsu binary threshold
-  - [ ] Extract largest connected component (fundus disc)
-  - [ ] Compute bounding box → crop
-  - [ ] Handle edge case: multiple bright regions
-- [ ] Implement **Green-Channel CLAHE**
-  - [ ] Extract green channel (best vascular/lesion contrast for fundus images)
-  - [ ] Apply CLAHE with configurable clip limit (default: 2.0) and tile grid size (default: 8×8)
-  - [ ] Multi-channel CLAHE variant on LAB color space for color-preserved output
-- [ ] Implement **Non-Local Means (NLM) Denoising**
-  - [ ] NLM denoising with configurable filter strength (h parameter)
-  - [ ] Noise level estimator to auto-select denoising strength
-  - [ ] Edge preservation validation (no critical feature smearing)
-- [ ] Implement **Standardization to 512×512**
-  - [ ] Resize with aspect ratio preservation + padding, or direct resize
-  - [ ] Pixel value normalization (0–1 float or 0–255 uint8, configurable)
-  - [ ] Output format: NumPy array ready for PyTorch tensor conversion
-- [ ] Implement **Quality-Adaptive Parameter Selection**
-  - [ ] Define `low`, `medium`, and `high` enhancement profiles
-  - [ ] Map quality gate scores to the appropriate profile (borderline images get stronger enhancement)
-- [ ] Implement **Full Enhancement Pipeline Orchestrator**
-  - [ ] Sequential chain: ROI Crop → Green-Channel CLAHE → NLM Denoise → Standardize
-  - [ ] Before/after quality metric comparison
-  - [ ] Save enhanced image with enhancement metadata (parameters used, scores)
-  - [ ] Output must be ready for both downstream tracks (512×512×3 NumPy array)
+- [x] Implement **Otsu-Threshold ROI Cropping**
+  - [x] Convert to grayscale → Otsu binary threshold
+  - [x] Extract largest connected component (fundus disc)
+  - [x] Compute bounding box → crop
+  - [x] Handle edge case: multiple bright regions
+- [x] Implement **Green-Channel CLAHE**
+  - [x] Extract green channel (best vascular/lesion contrast for fundus images)
+  - [x] Apply CLAHE with configurable clip limit (default: 2.0) and tile grid size (default: 8×8)
+  - [x] Multi-channel CLAHE variant on LAB color space for color-preserved output
+- [x] Implement **Non-Local Means (NLM) Denoising**
+  - [x] NLM denoising with configurable filter strength (h parameter)
+  - [x] Noise level estimator to auto-select denoising strength
+  - [x] Edge preservation validation (no critical feature smearing)
+- [x] Implement **Standardization to 512×512**
+  - [x] Resize with aspect ratio preservation + padding, or direct resize
+  - [x] Pixel value normalization (0–1 float or 0–255 uint8, configurable)
+  - [x] Output format: NumPy array ready for PyTorch tensor conversion
+- [x] Implement **Quality-Adaptive Parameter Selection**
+  - [x] Define `low`, `medium`, and `high` enhancement profiles
+  - [x] Map quality gate scores to the appropriate profile (borderline images get stronger enhancement)
+- [x] Implement **Full Enhancement Pipeline Orchestrator**
+  - [x] Sequential chain: ROI Crop → Green-Channel CLAHE → NLM Denoise → Standardize
+  - [x] Before/after quality metric comparison
+  - [x] Save enhanced image with enhancement metadata (parameters used, scores)
+  - [x] Output must be ready for both downstream tracks (512×512×3 NumPy array)
 
 ---
 
 ## 5. Configuration — `configs/default_config.yaml`
 
-- [ ] Define **Quality Gate Thresholds**
-  - [ ] `blur_variance_min`: minimum Laplacian variance for passing
-  - [ ] `brightness_min` / `brightness_max`: acceptable intensity range
-  - [ ] `fov_coverage_min`: minimum FOV completeness percentage
-- [ ] Define **Enhancement Parameters**
-  - [ ] CLAHE: `clip_limit`, `tile_grid_size`
-  - [ ] NLM: `h` (filter strength), `template_window`, `search_window`
-  - [ ] Output: `target_size` (512×512), `normalization_mode`
-- [ ] Support YAML config file loading with defaults
+- [x] Define **Quality Gate Thresholds**
+  - [x] `blur_variance_min`: minimum Laplacian variance for passing
+  - [x] `brightness_min` / `brightness_max`: acceptable intensity range
+  - [x] `fov_coverage_min`: minimum FOV completeness percentage
+- [x] Define **Enhancement Parameters**
+  - [x] CLAHE: `clip_limit`, `tile_grid_size`
+  - [x] NLM: `h` (filter strength), `template_window`, `search_window`
+  - [x] Output: `target_size` (512×512), `normalization_mode`
+- [x] Support YAML config file loading with defaults
 
 ---
 
 ## 6. Testing — `tests/test_quality_gate.py` + `tests/test_enhancement.py`
 
 ### Quality Gate Tests (`test_quality_gate.py`)
-- [ ] Sharp image scores above blur threshold → passes
-- [ ] Synthetically blurred image (Gaussian kernel 31×31) → triggers `FAIL_BLUR`
-- [ ] Dark image (gamma = 3.0) → triggers `FAIL_UNDEREXPOSED`
-- [ ] Overexposed image (gamma = 0.3) → triggers `FAIL_OVEREXPOSED`
-- [ ] Cropped FOV (30% coverage) → triggers `FAIL_FOV`
-- [ ] Multi-failure image → returns all applicable fail codes
-- [ ] Borderline threshold edge case handling
-- [ ] Recapture alert returns correct human-readable messages per fail code
-- [ ] Rejection logging writes correct structured data
+- [x] Sharp image scores above blur threshold → passes
+- [x] Synthetically blurred image (Gaussian kernel 31×31) → triggers `FAIL_BLUR`
+- [x] Dark image (gamma = 3.0) → triggers `FAIL_UNDEREXPOSED`
+- [x] Overexposed image (gamma = 0.3) → triggers `FAIL_OVEREXPOSED`
+- [x] Cropped FOV (30% coverage) → triggers `FAIL_FOV`
+- [x] Multi-failure image → returns all applicable fail codes
+- [x] Borderline threshold edge case handling
+- [x] Recapture alert returns correct human-readable messages per fail code
+- [x] Rejection logging writes correct structured data
 
 ### Enhancement Tests (`test_enhancement.py`)
-- [ ] Otsu ROI crop correctly isolates fundus disc (non-black content preserved)
-- [ ] Green-channel CLAHE increases histogram spread (contrast improvement)
-- [ ] NLM denoising reduces noise (SNR improvement measured)
-- [ ] Output shape is exactly 512×512
-- [ ] Full pipeline: image in → enhanced 512×512 array out
-- [ ] Enhancement does not introduce visible artifacts on clinical features
-- [ ] Before/after quality comparison shows improvement
+- [x] Otsu ROI crop correctly isolates fundus disc (non-black content preserved)
+- [x] Green-channel CLAHE increases histogram spread (contrast improvement)
+- [x] NLM denoising reduces noise (SNR improvement measured)
+- [x] Output shape is exactly 512×512
+- [x] Full pipeline: image in → enhanced 512×512 array out
+- [x] Enhancement does not introduce visible artifacts on clinical features
+- [x] Before/after quality comparison shows improvement
 
 ### Integration Test
-- [ ] End-to-end: load fundus image → quality gate → (pass) → adaptive enhance → 512×512 output ready for dual-track AI
-- [ ] End-to-end: load bad fundus image → quality gate → (fail) → recapture alert with codes
-- [ ] Test with sample images from APTOS/IDRiD datasets
-- [ ] Verify enhanced output format is compatible with AI input requirements (512×512×3, normalized)
+- [x] End-to-end: load fundus image → quality gate → (pass) → adaptive enhance → 512×512 output ready for dual-track AI
+- [x] End-to-end: load bad fundus image → quality gate → (fail) → recapture alert with codes
+- [x] Test with sample images from APTOS/IDRiD datasets
+- [x] Verify enhanced output format is compatible with AI input requirements (512×512×3, normalized)
 
 ### Downstream Handoff Validation
-- [ ] Confirm enhancement output shape/dtype matches the shared input expected by UNet++ and Hybrid Grading
-- [ ] Verify the pipeline stub: Quality Gate → Enhancement → (placeholders for Track A & B) runs without errors
-- [ ] Document the interface contract: what Enhancement outputs and what both AI tracks expect
+- [x] Confirm enhancement output shape/dtype matches the shared input expected by UNet++ and Hybrid Grading
+- [x] Verify the pipeline stub: Quality Gate → Enhancement → (placeholders for Track A & B) runs without errors
+- [x] Document the interface contract: what Enhancement outputs and what both AI tracks expect
 
 ---
 
 ## 7. Sample Data & Utilities
 
-- [ ] Download/prepare 5–10 sample fundus images for development testing
-  - [ ] 2–3 good quality images from APTOS/IDRiD (should pass quality gate)
-  - [ ] 2–3 poor quality images (should fail — blurred, dark, overexposed)
-  - [ ] 1–2 borderline quality images
-- [ ] Create `data/sample_images/` directory with test images
-- [ ] Create utility script to visualize:
-  - [ ] Quality gate scores (bar chart per metric)
-  - [ ] Enhancement before/after comparison (side-by-side)
-  - [ ] Histogram comparison pre/post CLAHE
+- [x] Download/prepare 5–10 sample fundus images for development testing
+  - [x] 2–3 good quality images from APTOS/IDRiD (should pass quality gate)
+  - [x] 2–3 poor quality images (should fail — blurred, dark, overexposed)
+  - [x] 1–2 borderline quality images
+- [x] Create `data/sample_images/` directory with test images
+- [x] Create utility script to visualize:
+  - [x] Quality gate scores (bar chart per metric)
+  - [x] Enhancement before/after comparison (side-by-side)
+  - [x] Histogram comparison pre/post CLAHE
