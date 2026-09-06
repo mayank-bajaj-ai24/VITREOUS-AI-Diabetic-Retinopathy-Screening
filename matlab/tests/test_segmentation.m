@@ -298,3 +298,167 @@ truth.disc_radius  = disc_r;
 truth.fovea_center = mac_c;
 truth.retina_mask  = retina;
 end
+
+% ─── UNet++ architecture ──────────────────────────────────────────────────
+
+function testUnetppNodeCountMatchesLattice(testCase)
+% A UNet++ of depth L has (L+1)(L+2)/2 nodes: the encoder column plus the
+% nested triangle. Anything else means skip paths are missing.
+for depth = 2:4
+    [~, info] = unetpp_layers([128 128 3], 5, ...
+        struct('BaseFilters', 4, 'Depth', depth));
+    expected = (depth + 1) * (depth + 2) / 2;
+    verifyEqual(testCase, info.num_nodes, expected, ...
+        sprintf('depth %d should give %d nodes', depth, expected));
+end
+end
+
+function testUnetppNestedSkipConnectivity(testCase)
+% The defining property of UNet++: X(i,j) must receive every shallower node at
+% its own depth plus an upsample of X(i+1,j-1). A plain U-Net has only the
+% single X(i,0) -> decoder skip, so this is the test that distinguishes them.
+depth = 3;
+[net, ~] = unetpp_layers([64 64 3], 5, ...
+    struct('BaseFilters', 4, 'Depth', depth));
+conns = net.Connections;
+
+for j = 1:depth
+    for i = 0:(depth - j)
+        cat_name = sprintf('x%d_%d_cat', i, j);
+        sources = conns.Source(startsWith(conns.Destination, [cat_name '/']));
+        sources = string(sources);
+
+        % One input per shallower node at this depth, plus the upsample
+        verifyEqual(testCase, numel(sources), j + 1, ...
+            sprintf('%s should have %d inputs', cat_name, j + 1));
+
+        for k = 0:(j - 1)
+            expected = sprintf('x%d_%d_relu2', i, k);
+            verifyTrue(testCase, any(sources == expected), ...
+                sprintf('%s must receive %s', cat_name, expected));
+        end
+
+        up_name = sprintf('up%d_%d', i, j);
+        verifyTrue(testCase, any(sources == up_name), ...
+            sprintf('%s must receive %s', cat_name, up_name));
+
+        % That upsample must come from one level deeper, one step earlier
+        up_src = string(conns.Source(conns.Destination == string(up_name)));
+        verifyEqual(testCase, up_src, string(sprintf('x%d_%d_relu2', i + 1, j - 1)));
+    end
+end
+end
+
+function testUnetppForwardPassShapeAndSoftmax(testCase)
+info = lesion_classes();
+net = unetpp_layers([64 64 3], info.num_classes, ...
+    struct('BaseFilters', 4, 'Depth', 3));
+net = initialize(net);
+
+x = dlarray(rand(64, 64, 3, 2, 'single'), 'SSCB');
+y = extractdata(predict(net, x));
+
+% Segmentation must preserve spatial size and emit one channel per class
+verifyEqual(testCase, size(y), [64, 64, info.num_classes, 2]);
+
+% Softmax over the channel dimension. Cast to double: verifyEqual refuses a
+% tolerance against single values.
+verifyEqual(testCase, double(sum(y, 3)), ones(64, 64, 1, 2), 'AbsTol', 1e-4);
+end
+
+function testUnetppDeepSupervisionGivesOneHeadPerLevel(testCase)
+depth = 3;
+[net, info] = unetpp_layers([64 64 3], 5, struct( ...
+    'BaseFilters', 4, 'Depth', depth, 'DeepSupervision', true));
+
+verifyEqual(testCase, numel(info.head_names), depth);
+verifyEqual(testCase, numel(net.OutputNames), depth);
+
+% Batch of 2: MATLAB drops a trailing singleton, so a batch of 1 would report
+% a 3-element size and mask a genuine shape error.
+net = initialize(net);
+x = dlarray(rand(64, 64, 3, 2, 'single'), 'SSCB');
+[o1, o2, o3] = predict(net, x);
+for o = {o1, o2, o3}
+    verifyEqual(testCase, size(extractdata(o{1})), [64, 64, 5, 2]);
+end
+end
+
+function testUnetppRejectsIndivisibleInput(testCase)
+% Four pooling stages need a size divisible by 16; failing loudly here is far
+% better than a shape mismatch deep inside training.
+verifyError(testCase, ...
+    @() unetpp_layers([500 500 3], 5, struct('Depth', 4)), ...
+    'NETRA:UnetppBadInputSize');
+end
+
+% ─── Tiling ───────────────────────────────────────────────────────────────
+
+function testTilesCoverCanvasCompletely(testCase)
+img = reshape(uint8(mod(0:(1024*1024*3 - 1), 251)), 1024, 1024, 3);
+[tiles, positions] = tile_image(img, 512, 128);
+
+verifyEqual(testCase, size(tiles, 1), 512);
+verifyEqual(testCase, size(tiles, 4), size(positions, 1));
+
+% Every canvas pixel must be covered by at least one tile
+covered = false(1024, 1024);
+for k = 1:size(positions, 1)
+    r = positions(k, 1); c = positions(k, 2);
+    covered(r:r+511, c:c+511) = true;
+end
+verifyTrue(testCase, all(covered(:)), 'Tiling left canvas pixels uncovered');
+end
+
+function testTilesPreserveContent(testCase)
+img = reshape(uint8(mod(0:(768*768*3 - 1), 251)), 768, 768, 3);
+[tiles, positions] = tile_image(img, 256, 64);
+
+for k = 1:size(positions, 1)
+    r = positions(k, 1); c = positions(k, 2);
+    verifyEqual(testCase, tiles(:, :, :, k), img(r:r+255, c:c+255, :));
+end
+end
+
+function testTileStitchRoundTripIsLossless(testCase)
+% Tiling then stitching a smooth signal must return it unchanged. If this
+% drifts, every stitched probability map is quietly wrong.
+[X, Y] = meshgrid(linspace(0, 1, 1024), linspace(0, 1, 1024));
+img = 0.3 + 0.5 * sin(6 * X) .* cos(4 * Y);
+img = repmat(img, 1, 1, 2);
+
+[tiles, positions] = tile_image(img, 512, 128);
+back = stitch_tiles(tiles, positions, [1024, 1024]);
+
+verifyEqual(testCase, size(back), size(img));
+verifyEqual(testCase, back, img, 'AbsTol', 1e-9);
+end
+
+function testStitchLeavesNoSeams(testCase)
+% Feathering exists to kill seams. A constant field must come back constant:
+% any gradient at a tile boundary would show up as a seam in a lesion map.
+tiles = ones(512, 512, 1, 9);
+positions = zeros(9, 2);
+starts = [1, 257, 513];
+k = 0;
+for r = starts
+    for c = starts
+        k = k + 1;
+        positions(k, :) = [r, c];
+    end
+end
+
+back = stitch_tiles(tiles, positions, [1024, 1024]);
+verifyEqual(testCase, back, ones(1024, 1024), 'AbsTol', 1e-9);
+end
+
+function testStitchRejectsMismatchedPositions(testCase)
+verifyError(testCase, ...
+    @() stitch_tiles(ones(64, 64, 1, 4), zeros(3, 2), [128, 128]), ...
+    'NETRA:PositionMismatch');
+end
+
+function testTileImageRejectsOversizedTile(testCase)
+verifyError(testCase, @() tile_image(ones(100, 100, 3), 256, 32), ...
+    'NETRA:TileTooLarge');
+end
