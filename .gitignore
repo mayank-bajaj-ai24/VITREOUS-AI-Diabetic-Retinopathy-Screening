@@ -225,3 +225,6 @@ data/datasets/
 
 # NETRA: prepared training tiles are regenerable from data/datasets
 data/processed/
+
+# NETRA: generated walkthrough output
+data/sample_images/walkthrough/
