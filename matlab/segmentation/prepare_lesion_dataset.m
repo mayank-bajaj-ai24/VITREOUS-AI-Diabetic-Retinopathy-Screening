@@ -1,8 +1,8 @@
-function manifest = prepare_lesion_dataset(idrid_root, output_dir, cfg, options)
-% PREPARE_LESION_DATASET  Build the Phase 3 training set from IDRiD annotations
+function manifest = prepare_lesion_dataset(dataset_roots, output_dir, cfg, options)
+% PREPARE_LESION_DATASET  Build the Phase 3 training set from lesion annotations
 %
-%   manifest = prepare_lesion_dataset(idrid_root, output_dir, cfg)
-%   manifest = prepare_lesion_dataset(idrid_root, output_dir, cfg, options)
+%   manifest = prepare_lesion_dataset(root, output_dir, cfg)
+%   manifest = prepare_lesion_dataset({rootA, rootB}, output_dir, cfg, options)
 %
 %   Takes raw IDRiD fundus images and their per-lesion ground truth, pushes both
 %   through the Phase 1 quality gate and the Phase 2 enhancement geometry, and
@@ -15,24 +15,39 @@ function manifest = prepare_lesion_dataset(idrid_root, output_dir, cfg, options)
 %   report an error -- the network would simply train on noise. apply_geometry
 %   replays that transform from the bbox enhance_fundus reports.
 %
-%   Expected IDRiD layout (folder names are matched case-insensitively and by
-%   keyword, so the leading numbers and spacing may vary):
+%   Two dataset layouts are recognised and may be combined by passing a cell
+%   array of roots. Each is detected by its directory structure.
 %
-%     <idrid_root>/
-%       A. Segmentation/
-%         1. Original Images/a. Training Set/IDRiD_01.jpg
-%         2. All Segmentation Groundtruths/a. Training Set/
-%             1. Microaneurysms/IDRiD_01_MA.tif
-%             2. Haemorrhages/IDRiD_01_HE.tif
-%             3. Hard Exudates/IDRiD_01_EX.tif
-%             4. Soft Exudates/IDRiD_01_SE.tif
+%   IDRiD (folder names matched by keyword, so numbering and spacing may vary):
+%     <root>/A. Segmentation/
+%       1. Original Images/a. Training Set/IDRiD_01.jpg
+%       2. All Segmentation Groundtruths/a. Training Set/
+%           1. Microaneurysms/IDRiD_01_MA.tif   ... 4. Soft Exudates/...
+%
+%   DDR:
+%     <root>/lesion_segmentation/
+%       images/{train,val,test}/007-1774-100.jpg
+%       annotations/{train,val,tet}/{MA,HE,EX,SE}/007-1774-100.tif
+%     Note the annotations directory for the test split is spelled "tet" in the
+%     published dataset. That is the dataset's typo, not a mistake here.
+%
+%   The two differ in a way that matters. IDRiD omits a mask file when a class
+%   was not annotated for an image, so absence means unknown. DDR ships a mask
+%   for every class on every image, empty where the lesion is absent, so absence
+%   means a genuine annotated negative. Empty masks are therefore kept as
+%   supervised negatives rather than treated as missing annotations.
 %
 %   Inputs:
-%     idrid_root - Root of the extracted IDRiD segmentation archive
+%     dataset_roots - One dataset root, or a cell array of roots to combine
 %     output_dir - Destination for the prepared tiles
 %     cfg        - Config struct from load_config
 %     options    - Optional struct:
-%       .ValFraction        - Held-out fraction, split by IMAGE (default 0.2)
+%       .SplitMode          - 'official' (default) uses each dataset's own
+%                             train / val / test designation, which is what
+%                             published results are measured against. 'random'
+%                             splits by image using ValFraction, which produces
+%                             numbers comparable to nothing.
+%       .ValFraction        - Held-out fraction for SplitMode 'random' (0.2)
 %       .RejectFailedQuality- Drop images failing Phase 1 (default true, per the
 %                             project rule that all training data passes the
 %                             gate). Counts are always reported.
@@ -55,6 +70,7 @@ if nargin < 4
     options = struct();
 end
 defaults = struct( ...
+    'SplitMode',           'official', ...
     'ValFraction',         0.2, ...
     'RejectFailedQuality', true, ...
     'NegativeRatio',       0.3, ...
@@ -67,64 +83,59 @@ for i = 1:numel(fn)
     end
 end
 
-if ~isfolder(idrid_root)
-    error('NETRA:DatasetNotFound', ...
-        ['IDRiD root not found: %s\n' ...
-         'Expected the extracted segmentation archive containing ' ...
-         '"A. Segmentation".'], idrid_root);
-end
-
 classes = lesion_classes();
 canvas_size = cfg.segmentation.input_size;
 tile_size   = cfg.segmentation.tile_size;
 overlap     = cfg.segmentation.tile_overlap;
 
-% ─── Locate the dataset ──────────────────────────────────────────────────
-sets = struct('name', {'train', 'test'}, 'keyword', {'training', 'testing'});
-records = [];
-
-for s = 1:numel(sets)
-    img_dir = find_dir(idrid_root, {'original images', sets(s).keyword});
-    gt_dir  = find_dir(idrid_root, {'groundtruth', sets(s).keyword});
-    if isempty(img_dir)
-        continue;
-    end
-
-    files = [dir(fullfile(img_dir, '*.jpg')); dir(fullfile(img_dir, '*.png')); ...
-             dir(fullfile(img_dir, '*.tif'))];
-    for f = 1:numel(files)
-        rec = struct();
-        rec.image_path = fullfile(files(f).folder, files(f).name);
-        [~, rec.stem, ~] = fileparts(files(f).name);
-        rec.source_set = sets(s).name;
-        rec.gt_dir = gt_dir;
-        records = [records; rec]; %#ok<AGROW>
-    end
+% ─── Locate the datasets ─────────────────────────────────────────────────
+if ~iscell(dataset_roots)
+    dataset_roots = {dataset_roots};
 end
 
-if isempty(records)
-    error('NETRA:DatasetEmpty', ...
-        'No images found under %s. Check the archive layout.', idrid_root);
+records = [];
+for r = 1:numel(dataset_roots)
+    root = dataset_roots{r};
+    if ~isfolder(root)
+        error('NETRA:DatasetNotFound', 'Dataset root not found: %s', root);
+    end
+    found = discover_dataset(root, classes);
+    if isempty(found)
+        error('NETRA:DatasetEmpty', ...
+            ['No recognised lesion dataset under %s. Expected an IDRiD ' ...
+             '"A. Segmentation" tree or a DDR "lesion_segmentation" tree.'], root);
+    end
+    fprintf('  %-8s %4d images from %s\n', found(1).dataset, numel(found), root);
+    records = [records; found]; %#ok<AGROW>
 end
 
 if isfinite(options.Limit)
     records = records(1:min(numel(records), options.Limit));
 end
 
-fprintf('Found %d annotated images.\n', numel(records));
+fprintf('Found %d annotated images in total.\n', numel(records));
 
 % ─── Image-level split ───────────────────────────────────────────────────
 % Split by image, never by tile: tiles from one fundus overlap each other, so a
 % tile-level split leaks the validation retina into training and produces a
 % validation Dice that means nothing.
 rng(options.Seed);
-order = randperm(numel(records));
-n_val = max(1, round(options.ValFraction * numel(records)));
-val_idx = false(numel(records), 1);
-val_idx(order(1:n_val)) = true;
+
+if strcmpi(options.SplitMode, 'official')
+    % Each dataset's own designation. Published results are measured against
+    % these splits, so a number produced any other way cannot be compared to
+    % anyone else's.
+    assigned = {records.source_set};
+    assigned(strcmp(assigned, 'test')) = {'test'};
+else
+    order = randperm(numel(records));
+    n_val = max(1, round(options.ValFraction * numel(records)));
+    assigned = repmat({'train'}, 1, numel(records));
+    assigned(order(1:n_val)) = {'val'};
+end
 
 % ─── Output tree ─────────────────────────────────────────────────────────
-splits = {'train', 'val'};
+splits = {'train', 'val', 'test'};
 for s = 1:numel(splits)
     for sub = {'images', 'labels'}
         d = fullfile(output_dir, splits{s}, sub{1});
@@ -146,10 +157,7 @@ n_kept = 0;
 
 for r = 1:numel(records)
     rec = records(r);
-    split = 'train';
-    if val_idx(r)
-        split = 'val';
-    end
+    split = assigned{r};
 
     fprintf('[%3d/%3d] %-14s (%s) ', r, numel(records), rec.stem, split);
 
@@ -203,11 +211,20 @@ for r = 1:numel(records)
     supervised(1) = true;   % background
 
     for name = paint_order
-        mask_path = find_lesion_mask(rec.gt_dir, rec.stem, name);
+        class_id = find(classes.names == name);
+        mask_path = rec.mask_paths{class_id};
         if isempty(mask_path)
+            % No file at all: the class was not annotated for this image, so its
+            % status is unknown and must not be scored. This is IDRiD's
+            % convention for soft exudates on 41 of its 81 images.
             continue;
         end
-        supervised(classes.names == name) = true;
+
+        % A file that exists is an annotation, even when it is empty. DDR ships
+        % an empty mask where a lesion is genuinely absent, which is a true
+        % negative and exactly the signal a model trained only on diseased eyes
+        % has never seen.
+        supervised(class_id) = true;
         m = imread(mask_path);
         if size(m, 3) > 1
             m = m(:, :, 1);
@@ -218,8 +235,11 @@ for r = 1:numel(records)
             m = imresize(m, [size(raw, 1), size(raw, 2)], 'nearest');
         end
 
+        if ~any(m(:))
+            continue;   % annotated, none present: supervision recorded above
+        end
+
         m_canvas = apply_geometry(m, geom, 'nearest');
-        class_id = find(classes.names == name);
         label(m_canvas) = uint8(class_id);
         found(end + 1) = name; %#ok<AGROW>
     end
@@ -265,6 +285,7 @@ for r = 1:numel(records)
         entry.position   = positions(k, :);
         entry.geom       = geom;
         entry.source_set = rec.source_set;
+        entry.dataset    = rec.dataset;
         entry.quality_passed = q.is_passed;
         entry.supervised = supervised;
         class_supervised_tiles = class_supervised_tiles + double(supervised);
@@ -380,47 +401,137 @@ end
 end
 
 
-function p = find_lesion_mask(gt_dir, stem, class_name)
-% FIND_LESION_MASK  Find one image's mask for one lesion class
-%   IDRiD names files like IDRiD_01_MA.tif and groups them into per-lesion
-%   folders. Both the folder keywords and the suffix are matched, and British
-%   and American spellings of haemorrhage are both accepted.
-p = '';
-if isempty(gt_dir) || ~isfolder(gt_dir)
+function stem = prefix_stem(dataset, stem)
+% PREFIX_STEM  Namespace an image stem by its dataset
+%   Stems must be unique once datasets are combined, but IDRiD's are already
+%   prefixed, so prefixing unconditionally yields IDRiD_IDRiD_01.
+if startsWith(lower(stem), [lower(dataset) '_'])
     return;
 end
-
-switch class_name
-    case "microaneurysm"
-        keys = {'microaneurysm'};        suffix = 'MA';
-    case "haemorrhage"
-        keys = {'aemorrhage'};           suffix = 'HE';
-    case "hard_exudate"
-        keys = {'hard exudate'};         suffix = 'EX';
-    case "soft_exudate"
-        keys = {'soft exudate'};         suffix = 'SE';
-    otherwise
-        return;
+stem = [dataset '_' stem];
 end
 
-candidates = dir(fullfile(gt_dir, '**', [stem '*']));
-candidates = candidates(~[candidates.isdir]);
 
-for i = 1:numel(candidates)
-    full = fullfile(candidates(i).folder, candidates(i).name);
-    lower_full = lower(full);
-    [~, name, ext] = fileparts(candidates(i).name);
+function records = discover_dataset(root, classes)
+% DISCOVER_DATASET  Detect the layout under root and enumerate its images
+%   Returns records carrying, per class, the path to that image's mask, or an
+%   empty string when the dataset provides none.
 
-    if ~ismember(lower(ext), {'.tif', '.tiff', '.png', '.gif', '.bmp'})
+records = [];
+
+if ~isempty(find_dir(root, {'original images'}))
+    records = discover_idrid(root, classes);
+elseif isfolder(fullfile(root, 'lesion_segmentation', 'images'))
+    records = discover_ddr(root, classes);
+end
+end
+
+
+function records = discover_idrid(root, classes)
+% DISCOVER_IDRID  IDRiD "A. Segmentation" tree
+%   Lesion folders are matched on keywords rather than exact names, because the
+%   leading numbers and spacing vary between mirrors of the archive. Both
+%   spellings of haemorrhage are accepted.
+keys = {'microaneurysm', 'aemorrhage', 'hard exudate', 'soft exudate'};
+suffix = {'MA', 'HE', 'EX', 'SE'};
+names = ["microaneurysm", "haemorrhage", "hard_exudate", "soft_exudate"];
+
+sets = struct('name', {'train', 'test'}, 'keyword', {'training', 'testing'});
+records = [];
+
+for s = 1:numel(sets)
+    img_dir = find_dir(root, {'original images', sets(s).keyword});
+    gt_dir  = find_dir(root, {'groundtruth', sets(s).keyword});
+    if isempty(img_dir)
         continue;
     end
 
-    folder_match = any(cellfun(@(k) contains(lower_full, k), keys));
-    suffix_match = endsWith(upper(name), ['_' suffix]);
+    files = [dir(fullfile(img_dir, '*.jpg')); dir(fullfile(img_dir, '*.png')); ...
+             dir(fullfile(img_dir, '*.tif'))];
 
-    if folder_match || suffix_match
-        p = full;
-        return;
+    for f = 1:numel(files)
+        [~, stem, ~] = fileparts(files(f).name);
+
+        mask_paths = repmat({''}, 1, classes.num_classes);
+        if ~isempty(gt_dir)
+            candidates = dir(fullfile(gt_dir, '**', [stem '*']));
+            candidates = candidates(~[candidates.isdir]);
+            for k = 1:numel(keys)
+                cid = find(classes.names == names(k));
+                for i = 1:numel(candidates)
+                    full = fullfile(candidates(i).folder, candidates(i).name);
+                    [~, nm, ext] = fileparts(candidates(i).name);
+                    if ~ismember(lower(ext), {'.tif', '.tiff', '.png', '.gif', '.bmp'})
+                        continue;
+                    end
+                    if contains(lower(full), keys{k}) || ...
+                            endsWith(upper(nm), ['_' suffix{k}])
+                        mask_paths{cid} = full;
+                        break;
+                    end
+                end
+            end
+        end
+
+        rec = struct();
+        rec.dataset    = 'IDRiD';
+        rec.image_path = fullfile(files(f).folder, files(f).name);
+        rec.stem       = prefix_stem('IDRiD', stem);
+        rec.source_set = sets(s).name;
+        rec.mask_paths = mask_paths;
+        records = [records; rec]; %#ok<AGROW>
+    end
+end
+
+% IDRiD publishes no validation split, so its 27 image test set serves as the
+% held-out set here.
+for i = 1:numel(records)
+    if strcmp(records(i).source_set, 'test')
+        records(i).source_set = 'val';
+    end
+end
+end
+
+
+function records = discover_ddr(root, classes)
+% DISCOVER_DDR  DDR "lesion_segmentation" tree
+%   Every image carries a mask for all four classes, empty where the lesion is
+%   absent. The annotations directory for the test split is spelled "tet" in the
+%   published dataset; that is the dataset's typo, reproduced here deliberately.
+base = fullfile(root, 'lesion_segmentation');
+img_splits = {'train', 'val',  'test'};
+ann_splits = {'train', 'val',  'tet'};
+abbrev     = {'MA', 'HE', 'EX', 'SE'};
+names = ["microaneurysm", "haemorrhage", "hard_exudate", "soft_exudate"];
+
+records = [];
+for s = 1:numel(img_splits)
+    img_dir = fullfile(base, 'images', img_splits{s});
+    if ~isfolder(img_dir)
+        continue;
+    end
+
+    files = [dir(fullfile(img_dir, '*.jpg')); dir(fullfile(img_dir, '*.png'))];
+    for f = 1:numel(files)
+        [~, stem, ~] = fileparts(files(f).name);
+
+        mask_paths = repmat({''}, 1, classes.num_classes);
+        for k = 1:numel(abbrev)
+            cid = find(classes.names == names(k));
+            candidate = fullfile(base, 'annotations', ann_splits{s}, ...
+                                 abbrev{k}, [stem '.tif']);
+            if isfile(candidate)
+                mask_paths{cid} = candidate;
+            end
+        end
+
+        rec = struct();
+        rec.dataset    = 'DDR';
+        rec.image_path = fullfile(files(f).folder, files(f).name);
+        rec.stem       = prefix_stem('DDR', stem);
+        rec.source_set = img_splits{s};
+        rec.mask_paths = mask_paths;
+        records = [records; rec]; %#ok<AGROW>
     end
 end
 end
