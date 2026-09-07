@@ -222,3 +222,6 @@ data/sample_images/segmentation_output/
 
 # NETRA: datasets are large and externally sourced - never commit them
 data/datasets/
+
+# NETRA: prepared training tiles are regenerable from data/datasets
+data/processed/
