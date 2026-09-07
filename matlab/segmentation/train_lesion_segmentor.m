@@ -161,13 +161,19 @@ else
     drop_period = options.LearnRateDropPeriod;
 end
 
+% Validate once per epoch. A fixed frequency tuned for a large dataset fires
+% several times per epoch on a small one, and each check is a full pass over
+% the validation set -- pure overhead on a CPU run.
+n_train = nnz(strcmp({manifest.tiles.split}, 'train'));
+validation_frequency = max(1, floor(n_train / max(options.MiniBatchSize, 1)));
+
 train_opts = trainingOptions('adam', ...
     'InitialLearnRate',       options.LearnRate, ...
     'MaxEpochs',              options.MaxEpochs, ...
     'MiniBatchSize',          options.MiniBatchSize, ...
     'Shuffle',                'every-epoch', ...
     'ValidationData',         val_ds, ...
-    'ValidationFrequency',    max(1, floor(50 / max(options.MiniBatchSize, 1))), ...
+    'ValidationFrequency',    validation_frequency, ...
     'ValidationPatience',     cfg.training.patience, ...
     'OutputNetwork',          'best-validation', ...
     'LearnRateSchedule',      options.LearnRateSchedule, ...
@@ -328,65 +334,6 @@ for c = 1:classes.num_classes
 end
 
 out = {img, cat(3, onehot, flags)};
-end
-
-
-function loss = lesion_loss(Y, T, class_weights, gamma, dice_weight)
-% LESION_LOSS  Weighted focal cross-entropy plus generalised Dice
-%
-%   Y - [H W C B]   softmax predictions
-%   T - [H W 2C B]  one-hot targets in channels 1..C, per-class supervision
-%                   flags in channels C+1..2C
-%
-%   Two independent masks apply:
-%     valid      - per pixel. Letterbox padding is labelled undefined and
-%                  one-hot encodes to all zeros, so it contributes nothing.
-%     supervised - per class per image. A class whose mask file was absent for
-%                  this image is not a negative, it is unknown, so neither loss
-%                  term may score predictions of it.
-
-epsilon = 1e-7;
-Y = max(min(Y, 1 - epsilon), epsilon);
-
-C = size(Y, 3);
-S = T(:, :, C+1:2*C, :);                % supervision flags
-T = T(:, :, 1:C, :);                    % one-hot labels
-
-% Undefined (letterbox padding) pixels are excluded from both terms
-valid = sum(T, 3);                      % [H W 1 B], 1 where labelled
-
-w = reshape(single(class_weights), 1, 1, []);
-
-% ─── Focal cross-entropy ─────────────────────────────────────────────────
-% (1 - p)^gamma collapses the contribution of confidently-correct background,
-% leaving the gradient to the small number of genuinely hard lesion pixels.
-focal = -w .* T .* ((1 - Y).^gamma) .* log(Y) .* S;
-ce_loss = sum(focal .* valid, 'all') / max(sum(valid .* S, 'all') / C, 1);
-
-% ─── Generalised Dice ────────────────────────────────────────────────────
-% Region overlap per class, weighted by inverse square frequency. A
-% background-only prediction scores zero here however good its pixel accuracy.
-Tm = T .* valid .* S;
-Ym = Y .* valid .* S;
-
-intersection = sum(Tm .* Ym, [1 2 4]);
-cardinality  = sum(Tm + Ym, [1 2 4]);
-
-dw = 1 ./ max(sum(Tm, [1 2 4]).^2, epsilon);
-dw = min(dw, 1e8);
-
-% A class supervised nowhere in this batch must drop out entirely rather than
-% contribute a spurious perfect or zero overlap.
-present = squeeze(sum(S, [1 2 4])) > 0;
-present = reshape(single(present), size(dw));
-dw = dw .* present;
-
-numerator   = 2 * sum(dw .* intersection);
-denominator = sum(dw .* cardinality);
-
-dice_loss = 1 - numerator / max(denominator, epsilon);
-
-loss = (1 - dice_weight) * ce_loss + dice_weight * dice_loss;
 end
 
 
