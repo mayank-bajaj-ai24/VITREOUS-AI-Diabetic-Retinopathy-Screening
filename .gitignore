@@ -228,3 +228,6 @@ data/processed/
 
 # NETRA: generated walkthrough output
 data/sample_images/walkthrough/
+
+# NETRA: model snapshots and comparison output
+data/sample_images/comparison/
