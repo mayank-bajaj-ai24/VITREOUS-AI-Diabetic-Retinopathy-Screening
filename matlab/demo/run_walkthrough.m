@@ -9,6 +9,9 @@ function run_walkthrough(image_path)
 %   sheet, so the whole journey from raw capture to clinical overlay can be
 %   inspected or shown in one image.
 %
+%   In the MATLAB desktop a figure opens and each stage appears in it as the
+%   pipeline reaches that stage.
+%
 %   The Phase 2 steps are invoked individually here to make each visible. The
 %   result is checked against enhance_fundus at the end, so this walkthrough
 %   cannot drift away from what the real pipeline produces.
@@ -38,6 +41,15 @@ canvas_size = cfg.segmentation.input_size;
 panels = {};
 titles = {};
 
+% Live figure in the desktop; silently skipped when running headless.
+live = usejava('desktop') && feature('ShowFigureWindows');
+fig = [];
+if live
+    fig = figure('Name', sprintf('NETRA Walkthrough - %s', stem), ...
+                 'NumberTitle', 'off', 'Color', [0.1 0.1 0.1], ...
+                 'Position', [80 80 1500 650]);
+end
+
 fprintf('========================================================\n');
 fprintf('NETRA Walkthrough: %s\n', stem);
 fprintf('========================================================\n\n');
@@ -47,6 +59,7 @@ raw = imread(image_path);
 fprintf('STAGE 0  Raw capture\n');
 fprintf('  %d x %d x %d, %s\n\n', size(raw,1), size(raw,2), size(raw,3), class(raw));
 panels{end+1} = square_fit(raw, canvas_size);   titles{end+1} = '0. Raw capture';
+draw_live(fig, panels, titles);
 
 % ═══ STAGE 1: quality gate ═══════════════════════════════════════════════
 q = quality_gate(image_path, cfg);
@@ -78,6 +91,7 @@ ch = gate_vis(:,:,1); ch(edge) = 0;   gate_vis(:,:,1) = ch;
 ch = gate_vis(:,:,3); ch(edge) = 0;   gate_vis(:,:,3) = ch;
 panels{end+1} = square_fit(gate_vis, canvas_size);
 titles{end+1} = sprintf('1. Quality gate PASS (cov %.2f)', q.metrics.fov.coverage_ratio);
+draw_live(fig, panels, titles);
 
 % ═══ STAGE 2: enhancement, step by step ══════════════════════════════════
 fprintf('STAGE 2  Quality-Adaptive Enhancement (Phase 2)\n');
@@ -85,6 +99,7 @@ fprintf('STAGE 2  Quality-Adaptive Enhancement (Phase 2)\n');
 [cropped, bbox] = crop_fundus_roi(raw, cfg.enhancement.crop_margin_pct);
 fprintf('  2a crop      bbox [%d %d %d %d]  -> %dx%d\n', bbox, size(cropped,1), size(cropped,2));
 panels{end+1} = square_fit(cropped, canvas_size); titles{end+1} = '2a. Fundus ROI crop';
+draw_live(fig, panels, titles);
 
 noise = estimate_noise(cropped);
 profile = select_profile(q.metrics, noise, cfg);
@@ -95,10 +110,12 @@ fprintf('  2b profile   noise sigma %.2f -> profile "%s" (clip %.1f, denoise %d)
 clahe = apply_clahe(cropped, prof.clahe_clip_limit, prof.clahe_tile_grid, cfg.enhancement.clahe_mode);
 fprintf('  2c CLAHE     %s channel, clip %.1f\n', cfg.enhancement.clahe_mode, prof.clahe_clip_limit);
 panels{end+1} = square_fit(clahe, canvas_size); titles{end+1} = sprintf('2b. CLAHE (%s profile)', profile);
+draw_live(fig, panels, titles);
 
 denoised = apply_nlm_denoising(clahe, prof.nlm_filter_strength, prof.nlm_search_window);
 fprintf('  2d denoise   non-local means, strength %d\n', prof.nlm_filter_strength);
 panels{end+1} = square_fit(denoised, canvas_size); titles{end+1} = '2c. NLM denoised';
+draw_live(fig, panels, titles);
 
 enhanced = standardize_image(denoised, canvas_size, cfg.enhancement.normalization_mode);
 geom = fundus_geometry(size(raw), bbox, canvas_size);
@@ -113,6 +130,7 @@ fprintf('  CHECK        max difference from enhance_fundus: %d\n\n', delta);
 
 canvas = im2uint8(enhanced);
 panels{end+1} = canvas; titles{end+1} = sprintf('2d. Enhanced %dx%d', canvas_size, canvas_size);
+draw_live(fig, panels, titles);
 
 % ═══ STAGE 3: segmentation ═══════════════════════════════════════════════
 fprintf('STAGE 3  Structure & Lesion Segmentation (Phase 3)\n');
@@ -125,6 +143,7 @@ vessels = segment_vessels(canvas, cfg, valid);
 fprintf('  3a vessels   density %.2f%% of FOV, mean calibre %.1f px\n', ...
     100*vessels.density, vessels.mean_width);
 panels{end+1} = tint(canvas, vessels.mask, [0 200 200]); titles{end+1} = '3a. Retinal vessels';
+draw_live(fig, panels, titles);
 
 od = locate_optic_disc(canvas, cfg, vessels.mask);
 fprintf('  3b disc      centre [%.0f %.0f] r %.1f  confidence %.2f (%s)\n', ...
@@ -141,6 +160,7 @@ if all(isfinite(od.fovea_center))
     anat = tint(anat, abs(d - od.fovea_radius) < 3, [255 0 255]);
 end
 panels{end+1} = anat; titles{end+1} = '3b. Optic disc + fovea';
+draw_live(fig, panels, titles);
 
 if has_model
     loaded = load(model_path, 'net');
@@ -158,6 +178,7 @@ if has_model
         lesion_only = tint(lesion_only, les.label_map == c, round(classes.colors(c,:)*255));
     end
     panels{end+1} = lesion_only; titles{end+1} = '3c. Lesion segmentation';
+draw_live(fig, panels, titles);
 
     final = anat;
     for c = classes.lesion_ids
@@ -165,6 +186,14 @@ if has_model
     end
     final = tint(final, vessels.mask & les.label_map <= 1, [0 150 150]);
     panels{end+1} = final; titles{end+1} = '4. Clinical overlay';
+
+    % A keyed copy of the final overlay, for reports and presentations
+    anat_items = struct( ...
+        'color', {[0 200 200], [0 255 0], [255 140 0], [255 0 255]}, ...
+        'label', {'vessels', 'optic disc', 'disc exclusion zone', 'fovea'});
+    imwrite(overlay_legend(final, anat_items), ...
+            fullfile(out_dir, 'clinical_overlay_keyed.png'));
+draw_live(fig, panels, titles);
 else
     fprintf('  3d lesions   no trained model at %s\n', model_path);
     fprintf('               run run_training first\n');
@@ -182,6 +211,29 @@ sheet_path = fullfile(out_dir, 'walkthrough.png');
 imwrite(sheet, sheet_path);
 fprintf('Contact sheet: %s\n', sheet_path);
 fprintf('========================================================\n');
+end
+
+
+function draw_live(fig, panels, titles)
+% DRAW_LIVE  Redraw the stages collected so far into the live figure
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+figure(fig);
+clf(fig);
+n = numel(panels);
+cols = min(5, max(n, 1));
+rows = ceil(n / cols);
+t = tiledlayout(fig, rows, cols, 'TileSpacing', 'compact', 'Padding', 'compact');
+t.Title.String = 'NETRA: Phase 1 -> Phase 2 -> Phase 3';
+t.Title.Color = 'w';
+t.Title.FontWeight = 'bold';
+for i = 1:n
+    ax = nexttile(t);
+    imshow(panels{i}, 'Parent', ax);
+    title(ax, titles{i}, 'Color', 'w', 'FontSize', 9, 'Interpreter', 'none');
+end
+drawnow;
 end
 
 
