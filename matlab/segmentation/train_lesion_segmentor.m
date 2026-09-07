@@ -196,7 +196,17 @@ for c = classes.lesion_ids
     fprintf('  %-15s %.4f\n', classes.names(c), dice_scores(c));
 end
 
+% Record which images this model actually trained on. Without it a saved model
+% has no provenance, and any later comparison against another model cannot tell
+% whether the evaluation images are genuinely held out from both.
+train_stems = unique({manifest.tiles(strcmp({manifest.tiles.split}, 'train')).stem});
+val_stems   = unique({manifest.tiles(strcmp({manifest.tiles.split}, 'val')).stem});
+
 results = struct();
+results.train_stems   = train_stems;
+results.val_stems     = val_stems;
+results.trained_on    = numel(train_stems);
+results.trained_at    = datetime('now');
 results.train_info    = train_info;
 results.class_weights = class_weights;
 results.class_freq    = freq;
