@@ -41,12 +41,52 @@ verifyFalse(testCase, res.passed);
 verifyEqual(testCase, res.fail_code, 'FAIL_UNDEREXPOSED');
 end
 
-function testFovCheck(testCase)
-% Circular disc in center
+function testFovCheckAcceptsFullFundus(testCase)
+% A centred disc covering ~71% of the frame is a normal capture.
+% (The previous version of this test used radius 80, which covers only 50%
+% of a 200x200 frame and so could never satisfy the coverage threshold.)
 [X, Y] = meshgrid(1:200, 1:200);
-disc = ((X - 100).^2 + (Y - 100).^2) <= 80^2;
+disc = ((X - 100).^2 + (Y - 100).^2) <= 95^2;
 img = uint8(disc * 200);
+
 res = check_fov(img, testCase.TestData.cfg);
+
 verifyTrue(testCase, res.passed);
-verifyGreaterThan(testCase, res.coverage_ratio, 0.40);
+verifyEqual(testCase, res.fail_code, '');
+verifyEqual(testCase, res.coverage_ratio, pi * 95^2 / 200^2, 'AbsTol', 0.02);
+end
+
+function testFovCheckRejectsCutOffFundus(testCase)
+% A disc covering only ~28% of the frame is the failure this check exists for.
+[X, Y] = meshgrid(1:200, 1:200);
+disc = ((X - 100).^2 + (Y - 100).^2) <= 60^2;
+img = uint8(disc * 200);
+
+res = check_fov(img, testCase.TestData.cfg);
+
+verifyFalse(testCase, res.passed);
+verifyEqual(testCase, res.fail_code, 'FAIL_FOV_COVERAGE');
+end
+
+function testFovCheckSurvivesDarkPeriphery(testCase)
+% Regression test for the IDRiD_04 failure mode.
+%
+% A real fundus is bright centrally and falls off towards the periphery. An
+% Otsu threshold splits that gradient near its middle and classifies the dark
+% outer retina as surround, so coverage is badly under-reported: on IDRiD_04
+% it measured 0.526 against a true aperture of 0.795. A low absolute threshold
+% is unaffected, because the surround is genuinely near zero.
+[X, Y] = meshgrid(1:200, 1:200);
+r = sqrt((X - 100).^2 + (Y - 100).^2);
+disc = r <= 95;
+
+% Bright core falling to a dim rim, exactly the profile Otsu mishandles
+img = uint8(disc .* (200 - 170 * min(r / 95, 1)));
+
+res = check_fov(img, testCase.TestData.cfg);
+
+expected = pi * 95^2 / 200^2;
+verifyEqual(testCase, res.coverage_ratio, expected, 'AbsTol', 0.03, ...
+    'Dark peripheral retina must not be mistaken for surround');
+verifyTrue(testCase, res.passed);
 end

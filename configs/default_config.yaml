@@ -19,8 +19,13 @@ quality_gate:
     histogram_uniformity_min: 0.3     # Minimum histogram spread
 
   fov:
-    coverage_min: 0.70                # 70% FOV coverage required
+    surround_threshold: 10            # Grayscale level separating black surround from retina
+    coverage_min: 0.60                # Minimum fraction of frame covered by retina
     centering_max_offset: 0.15        # Max centroid offset from center (fraction of image)
+    # coverage_min was 0.70, which rejected 79 of 81 IDRiD images. Measured
+    # aperture coverage: IDRiD 0.690-0.796, APTOS samples 0.746-0.833, and a
+    # deliberately cut-off capture 0.173. 0.60 clears every legitimate capture
+    # and still separates them from a genuine framing failure by a wide margin.
 
 # ─── Enhancement Parameters (Phase 2) ───
 enhancement:

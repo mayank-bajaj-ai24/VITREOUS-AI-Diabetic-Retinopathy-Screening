@@ -219,3 +219,6 @@ __marimo__/
 
 # NETRA: generated demo output
 data/sample_images/segmentation_output/
+
+# NETRA: datasets are large and externally sourced - never commit them
+data/datasets/
