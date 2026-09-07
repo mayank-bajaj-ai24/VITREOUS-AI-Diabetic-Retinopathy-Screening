@@ -700,3 +700,30 @@ worse(4:8, 4:8, 2) = 0.96;      % only a quarter of the region found
 verifyLessThan(testCase, double(lesion_loss(better, T, w, 2, 0.5)), ...
                          double(lesion_loss(worse,  T, w, 2, 0.5)));
 end
+
+function testFovMaskRejectsGreenChannelArtifact(testCase)
+% Regression test. Phase 2 runs CLAHE on the green channel over the whole frame
+% including the black surround, lifting green there to about 19/255 while red
+% and blue stay at zero. A max-across-channels test accepts that as retina; on
+% IDRiD_06 it wrongly admitted 13.2% of the canvas, so lesions could be reported
+% outside the eye and lesion area fractions were computed against the wrong
+% denominator.
+img = zeros(200, 200, 3, 'uint8');
+
+% Genuine retina: bright in red and green, as a fundus is
+img(60:140, 60:140, 1) = 180;
+img(60:140, 60:140, 2) = 90;
+img(60:140, 60:140, 3) = 40;
+
+% Surround carrying only the CLAHE green lift
+img(:, :, 2) = max(img(:, :, 2), uint8(19));
+
+fov = estimate_fov_mask(img);
+
+verifyTrue(testCase, fov(100, 100), 'Real retina was rejected');
+verifyFalse(testCase, fov(10, 10), 'Green-only surround was accepted as retina');
+
+% The mask should recover the retina block, not the whole frame
+verifyLessThan(testCase, nnz(fov) / numel(fov), 0.35);
+verifyGreaterThan(testCase, nnz(fov) / numel(fov), 0.10);
+end

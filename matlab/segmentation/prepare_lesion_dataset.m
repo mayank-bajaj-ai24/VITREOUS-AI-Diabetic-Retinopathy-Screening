@@ -170,7 +170,16 @@ for r = 1:numel(records)
     % ─── Phase 2 geometry at segmentation scale ──────────────────────────
     [enhanced, meta] = enhance_fundus(raw, q, seg_cfg);
     geom = fundus_geometry(size(raw), meta.roi_bbox, canvas_size);
-    valid = canvas_valid_mask(geom);
+
+    % Retina is the intersection of the letterbox rectangle with the camera's
+    % circular aperture. The rectangle alone is not enough: on IDRiD the corners
+    % between the circle and the rectangle are 13% of the canvas, and labelling
+    % them background hands the network that much of every image as a free
+    % correct answer while skewing the class frequencies the loss weights come
+    % from. The aperture is taken from the RAW image, before Phase 2 lifts the
+    % green channel in the surround.
+    aperture = apply_geometry(estimate_fov_mask(raw), geom, 'nearest') > 0;
+    valid = canvas_valid_mask(geom) & aperture;
 
     % ─── Labels ──────────────────────────────────────────────────────────
     % Painted rarest-first-wins: where annotations overlap, the smaller and

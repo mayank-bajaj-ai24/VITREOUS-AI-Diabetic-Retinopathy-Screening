@@ -25,7 +25,20 @@ end
 
 img_d = im2double(img);
 if size(img_d, 3) == 3
-    chan = max(img_d, [], 3);   % brightest channel: red survives dark retinas
+    % Median across channels, not maximum.
+    %
+    % The maximum is defeated by any single artificially lifted channel. Phase 2
+    % applies CLAHE to the green channel across the whole frame, including the
+    % black surround, which raises green there from 0 to about 19/255 while red
+    % and blue stay near zero. Against a threshold of 15 the maximum then calls
+    % that surround retina: measured on IDRiD_06, 13.2% of the canvas -- the
+    % corners between the circular aperture and the letterbox rectangle -- was
+    % accepted as retina, so lesions could be reported outside the eye and every
+    % area fraction was divided by 80.3% of canvas instead of the true 67.1%.
+    %
+    % The median needs two of three channels above threshold. Real retina is
+    % bright in red and green together; a green-only artifact is rejected.
+    chan = median(img_d, 3);
 else
     chan = img_d;
 end
