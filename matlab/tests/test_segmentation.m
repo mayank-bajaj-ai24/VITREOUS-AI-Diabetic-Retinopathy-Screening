@@ -214,7 +214,7 @@ od = locate_optic_disc(img, testCase.TestData.cfg);
 
 verifyGreaterThanOrEqual(testCase, od.confidence, 0);
 verifyLessThanOrEqual(testCase, od.confidence, 1);
-verifyTrue(testCase, ismember(od.method, {'hough+intensity', 'intensity', 'failed'}));
+verifyTrue(testCase, ismember(od.method, {'hough+intensity', 'hough', 'intensity', 'failed'}));
 verifyTrue(testCase, ismember(od.fovea_side, {'left', 'right', ''}));
 verifyNumElements(testCase, od.disc_center, 2);
 verifyNumElements(testCase, od.fovea_center, 2);

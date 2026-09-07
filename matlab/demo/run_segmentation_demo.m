@@ -121,6 +121,13 @@ fprintf('========================================================\n');
 function overlay = render_overlay(canvas, vessels, od)
 % RENDER_OVERLAY  Paint the structural findings onto the fundus canvas
 overlay = im2uint8(canvas);
+
+% A grayscale sample image propagates a single channel all the way through
+% apply_geometry, and the colour indexing below would then fail after the whole
+% pipeline had already run.
+if size(overlay, 3) == 1
+    overlay = repmat(overlay, 1, 1, 3);
+end
 R = overlay(:, :, 1);
 G = overlay(:, :, 2);
 B = overlay(:, :, 3);

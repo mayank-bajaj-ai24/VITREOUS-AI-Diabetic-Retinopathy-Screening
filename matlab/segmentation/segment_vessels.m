@@ -107,9 +107,20 @@ tophat(~fov_eroded) = 0;
 calibre_min = max(1, round(p.calibre_min_pct * fov_diameter));
 thickness = unique(round(linspace(calibre_min, calibre_max, p.num_scales)));
 
+% fibermetric rejects a non-positive StructureSensitivity. A degenerate canvas
+% -- uniform, blank, or all dark -- gives an identically zero top-hat, so the
+% scaled sensitivity is zero and the call throws instead of returning an empty
+% result. segment_lesions runs this by default, so that would abort inference
+% rather than degrade.
+sensitivity = p.structure_sensitivity * max(tophat(:));
+if ~isfinite(sensitivity) || sensitivity <= 0
+    result = empty_result(h, w, fov_eroded, p);
+    return;
+end
+
 vesselness = fibermetric(tophat, thickness, ...
     'ObjectPolarity', 'bright', ...
-    'StructureSensitivity', p.structure_sensitivity * max(tophat(:)));
+    'StructureSensitivity', sensitivity);
 
 % Normalise against a high percentile rather than the max, so one saturated
 % artefact cannot squash the whole map.

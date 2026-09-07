@@ -47,7 +47,9 @@ function result = locate_optic_disc(img, cfg, vessel_mask)
 %                         The fovea is temporal to the disc, so this fixes the
 %                         eye's laterality under a given capture convention.
 %       .confidence     - [0,1] localisation confidence
-%       .method         - 'hough+intensity', 'intensity', or 'failed'
+%       .method         - which detector produced the answer: 'hough+intensity'
+%                         when both agreed, 'hough' or 'intensity' when they
+%                         disagreed and one outscored the other, or 'failed'
 %       .params         - parameters actually applied
 %
 %   See also IMFINDCIRCLES, SEGMENT_VESSELS, SEGMENT_LESIONS
@@ -199,11 +201,12 @@ elseif ~isempty(hough_center)
     if s_h >= s_i
         disc_center = hough_center;
         disc_radius = hough_radius;
+        method = 'hough';
     else
         disc_center = intensity_center;
         disc_radius = r_nominal;
+        method = 'intensity';
     end
-    method = 'intensity';
     agreement = 0.3;
 else
     disc_center = intensity_center;

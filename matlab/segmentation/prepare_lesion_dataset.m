@@ -246,9 +246,15 @@ for r = 1:numel(records)
         % Only supervised classes contribute to the frequency statistics that
         % drive the loss weights; an unannotated class must not be counted as
         % having zero pixels here, or its weight is inflated by phantom absence.
-        for c = 1:classes.num_classes
-            if supervised(c)
-                class_pixels(c) = class_pixels(c) + nnz(lab == c);
+        %
+        % Training tiles only. Deriving the loss weights partly from validation
+        % pixels leaks the held-out set into training and makes the reported
+        % validation score optimistic.
+        if strcmp(split, 'train')
+            for c = 1:classes.num_classes
+                if supervised(c)
+                    class_pixels(c) = class_pixels(c) + nnz(lab == c);
+                end
             end
         end
 
@@ -266,8 +272,15 @@ for r = 1:numel(records)
     end
 
     n_kept = n_kept + 1;
-    fprintf('lesions[%s] %d/%d tiles\n', ...
-        strjoin(cellstr(found), ','), nnz(keep), numel(keep));
+    % strjoin over an empty list yields '', which MATLAB drops from the argument
+    % list entirely, so %s would swallow the tile count and garble the line --
+    % on precisely the image whose missing annotations most need reporting.
+    if isempty(found)
+        found_str = 'NONE';
+    else
+        found_str = strjoin(cellstr(found), ',');
+    end
+    fprintf('lesions[%s] %d/%d tiles\n', found_str, nnz(keep), numel(keep));
 end
 
 % ─── Manifest ────────────────────────────────────────────────────────────
@@ -290,7 +303,7 @@ fprintf('\n───────────────────────
 fprintf('Images kept      : %d\n', n_kept);
 fprintf('Quality rejected : %d\n', n_rejected);
 fprintf('Tiles written    : %d\n', numel(tiles_meta));
-fprintf('\nClass distribution (over supervised tiles only):\n');
+fprintf('\nClass distribution (supervised TRAINING tiles only):\n');
 fprintf('  %-15s %14s %9s  %s\n', 'class', 'pixels', 'share', 'supervised tiles');
 total = sum(class_pixels);
 n_tiles = numel(tiles_meta);
@@ -324,11 +337,27 @@ end
 keep = has_lesion & is_usable;
 
 negatives = find(~has_lesion & is_usable);
-n_negative = round(negative_ratio * max(1, nnz(keep)));
-if ~isempty(negatives) && n_negative > 0
-    pick = negatives(randperm(numel(negatives), min(n_negative, numel(negatives))));
-    keep(pick) = true;
+if isempty(negatives)
+    return;
 end
+
+% An image with no lesions at all must still contribute. round(0.3 * 1) is 0,
+% so sampling proportionally to the positives silently discarded every healthy
+% fundus: a lesion-free image produced no positive tiles, therefore no negative
+% quota, therefore nothing at all. That is invisible on IDRiD, whose 81 images
+% all carry lesions by construction, and catastrophic on any dataset that
+% includes normal retinas -- the network would never see a healthy eye and
+% would report disease on every one of them.
+n_negative = round(negative_ratio * nnz(keep));
+if nnz(keep) == 0
+    n_negative = numel(negatives);   % nothing else to learn from this image
+else
+    n_negative = max(n_negative, 1); % always at least one negative alongside
+end
+
+n_negative = min(n_negative, numel(negatives));
+pick = negatives(randperm(numel(negatives), n_negative));
+keep(pick) = true;
 end
 
 

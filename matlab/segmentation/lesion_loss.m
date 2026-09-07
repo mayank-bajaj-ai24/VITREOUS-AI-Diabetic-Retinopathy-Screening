@@ -10,7 +10,17 @@ function loss = lesion_loss(Y, T, class_weights, gamma, dice_weight)
 %                  one-hot encodes to all zeros, so it contributes nothing.
 %     supervised - per class per image. A class whose mask file was absent for
 %                  this image is not a negative, it is unknown, so neither loss
-%                  term may score predictions of it.
+%                  term scores that class's own channel.
+%
+%   The supervision mask is a partial remedy, not a complete one. Where a class
+%   is unannotated its pixels remain labelled background, and background IS
+%   supervised, so a softmax head still pays a cross-entropy penalty on the
+%   background channel for putting mass on the unannotated class. Fully removing
+%   the coupling would mean abandoning background supervision on those images,
+%   which costs far more signal than it recovers. The residual effect is small
+%   because the affected classes are a fraction of a percent of pixels, but it
+%   is real and it biases the model against soft exudates on the 41 of 81 IDRiD
+%   images that lack an SE mask.
 
 epsilon = 1e-7;
 Y = max(min(Y, 1 - epsilon), epsilon);
@@ -28,7 +38,12 @@ w = reshape(single(class_weights), 1, 1, []);
 % (1 - p)^gamma collapses the contribution of confidently-correct background,
 % leaving the gradient to the small number of genuinely hard lesion pixels.
 focal = -w .* T .* ((1 - Y).^gamma) .* log(Y) .* S;
-ce_loss = sum(focal .* valid, 'all') / max(sum(valid .* S, 'all') / C, 1);
+% Normalise by the number of labelled pixels. Dividing the supervised-weighted
+% sum by C only equals that when every class is supervised; for a batch drawn
+% from images lacking a soft exudate mask the divisor shrinks to 0.8 of the
+% pixel count and inflates the term by 25%, making the balance between the two
+% loss terms depend on which images happened to land in the batch.
+ce_loss = sum(focal .* valid, 'all') / max(sum(valid, 'all'), 1);
 
 % ─── Generalised Dice ────────────────────────────────────────────────────
 % Region overlap per class, weighted by inverse square frequency. A

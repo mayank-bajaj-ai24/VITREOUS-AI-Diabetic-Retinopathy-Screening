@@ -11,18 +11,17 @@ function [net, results] = train_lesion_segmentor(data_dir, cfg, options)
 %
 %   Why not plain cross-entropy
 %   ---------------------------
-%   Lesion pixels are a small fraction of a fundus. Measured over the 728 tiles
-%   prepared from the 81 IDRiD segmentation images:
+%   Lesion pixels are a small fraction of a fundus. On IDRiD, background is
+%   around 97% of labelled pixels and microaneurysms are on the order of a tenth
+%   of one percent, i.e. hundreds of background pixels per microaneurysm pixel.
 %
-%       background      96.866 %
-%       hard exudate     1.514 %
-%       haemorrhage      1.263 %
-%       soft exudate     0.211 %   (supervised on only 360 of 728 tiles)
-%       microaneurysm    0.147 %
-%
-%   That is roughly 660 background pixels per microaneurysm pixel. The weighting
-%   below is derived from the counts prepare_lesion_dataset actually measured
-%   for the set in use, not from these figures. Unweighted
+%   No fixed figures are quoted here on purpose: they depend on the canvas size,
+%   on whether tiling is in use, and on the aperture mask, all of which have
+%   changed during development. prepare_lesion_dataset measures the distribution
+%   for the set actually prepared and prints it, this function prints the
+%   weights it derives from those counts at startup, and both are recorded in
+%   manifest.mat. Read the numbers from there, never from this comment.
+%   Unweighted
 %   cross-entropy is minimised by predicting background everywhere: such a
 %   network scores 99.5% pixel accuracy and detects nothing at all. The loss
 %   here is a sum of two terms that fail in different ways, so neither can be
