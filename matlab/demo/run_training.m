@@ -17,9 +17,17 @@
 %   BaseFilters sets the network width and dominates the run time. Measured on
 %   an Apple M1 Pro (CPU only, 8 threads) over 65 training images at 512x512:
 %
-%       BaseFilters =  8    0.6 M params    ~1.6 min/epoch    ~1.4 h for 50
-%       BaseFilters = 16    2.3 M params    ~3.3 min/epoch    ~2.7 h for 50
-%       BaseFilters = 32    9.0 M params    ~8.2 min/epoch    ~6.8 h for 50
+%   Measured on an Apple M1 Pro, CPU only, at 512x512 and batch 8, per 100
+%   TRAINING IMAGES. Multiply by however many the prepared set holds:
+%
+%       BaseFilters =  8    0.6 M params    ~1.9 min per epoch per 100 images
+%       BaseFilters = 16    2.3 M params    ~3.7 min per epoch per 100 images
+%       BaseFilters = 32    9.0 M params    ~9.2 min per epoch per 100 images
+%
+%   So 65 images at width 16 is about 2.4 min an epoch, while 437 is about 16.
+%   More data also means far more gradient steps per epoch, so fewer epochs are
+%   needed: 65 images took roughly 60 epochs to converge, which is 480 updates,
+%   and 437 images reach that in 9. Raise the width before the epoch count.
 %
 %   Start with 8 to confirm the whole run completes and produces sane numbers,
 %   then move to 32 for the result you actually report.
@@ -35,8 +43,16 @@ proj_root  = fullfile(script_dir, '..', '..');
 addpath(genpath(fullfile(proj_root, 'matlab')));
 
 cfg      = load_config(fullfile(proj_root, 'configs', 'default_config.yaml'));
-idrid    = fullfile(proj_root, 'data', 'datasets', 'idrid');
 data_dir = fullfile(proj_root, 'data', 'processed', 'segmentation');
+
+% Every lesion dataset present is used. IDRiD supplies 81 densely diseased eyes,
+% DDR another 757 that are mostly near-healthy, and the model needs both: one
+% teaches it what pathology looks like, the other what a normal retina looks
+% like, which IDRiD alone cannot show it.
+candidates = { ...
+    fullfile(proj_root, 'data', 'datasets', 'idrid'), ...
+    fullfile(proj_root, 'data', 'datasets', 'ddr')};
+roots = candidates(cellfun(@isfolder, candidates));
 
 fprintf('========================================================\n');
 fprintf('NETRA Phase 3 - UNet++ Lesion Segmentation Training\n');
@@ -44,15 +60,23 @@ fprintf('========================================================\n\n');
 
 % ─── Prepare the dataset if it is not already built ──────────────────────
 if ~isfile(fullfile(data_dir, 'manifest.mat'))
-    if ~isfolder(idrid)
-        error(['IDRiD not found at %s\n' ...
-               'Download "A. Segmentation.zip" and extract it there.'], idrid);
+    if isempty(roots)
+        error(['No lesion dataset found. Extract IDRiD "A. Segmentation.zip" to\n' ...
+               '  data/datasets/idrid/\n' ...
+               'and/or the DDR lesion_segmentation tree to\n' ...
+               '  data/datasets/ddr/']);
     end
-    fprintf('No prepared dataset found. Building it now (~10 minutes)...\n\n');
-    prepare_lesion_dataset(idrid, data_dir, cfg);
+    fprintf('No prepared dataset found. Building it now.\n');
+    fprintf('Roughly 10 minutes for IDRiD alone, 90 with DDR as well.\n\n');
+    prepare_lesion_dataset(roots, data_dir, cfg);
     fprintf('\n');
 else
-    fprintf('Using prepared dataset at %s\n\n', data_dir);
+    fprintf('Using prepared dataset at %s\n', data_dir);
+    L = load(fullfile(data_dir, 'manifest.mat'));
+    fprintf('  %d train, %d val, %d test images\n\n', ...
+        nnz(strcmp({L.manifest.tiles.split}, 'train')), ...
+        nnz(strcmp({L.manifest.tiles.split}, 'val')), ...
+        nnz(strcmp({L.manifest.tiles.split}, 'test')));
 end
 
 % ─── Training settings ───────────────────────────────────────────────────
@@ -60,7 +84,9 @@ end
 options = struct( ...
     'BaseFilters',          16, ...     % 8 fastest, 16 balanced, 32 the plan default
     'Depth',                4, ...
-    'MaxEpochs',            120, ...    % 50 was not enough; it never converged
+    'MaxEpochs',            30, ...     % 30 epochs over 437 images is ~1600
+                                    ... % updates, against ~480 for the 120
+                                    ... % epochs that converged on 65 images
     'MiniBatchSize',        8, ...
     'LearnRate',            1e-3, ...
     'Augment',              true, ...
