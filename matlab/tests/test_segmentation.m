@@ -592,3 +592,111 @@ net = initialize(unetpp_layers([256 256 3], lesion_classes().num_classes, ...
 
 img = synthetic_fundus(640);
 end
+
+% ─── Loss function ────────────────────────────────────────────────────────
+
+function testLossIgnoresLetterboxPadding(testCase)
+% Padding one-hot encodes to an all-zero vector and must contribute nothing.
+C = 5; w = ones(1, C);
+Y = ones(8, 8, C, 1, 'single') / C;
+
+T = zeros(8, 8, 2*C, 1, 'single');
+T(:, :, C+1:2*C) = 1;                 % everything supervised
+T(1:4, :, 1) = 1;                     % top half labelled background
+% bottom half left all-zero: undefined padding
+
+loss_padded = lesion_loss(Y, T, w, 2, 0.5);
+
+% Same content, but the padded half is simply not there
+T2 = T(1:4, :, :, :);
+loss_cropped = lesion_loss(Y(1:4, :, :, :), T2, w, 2, 0.5);
+
+verifyEqual(testCase, double(loss_padded), double(loss_cropped), 'AbsTol', 1e-5, ...
+    'Letterbox padding changed the loss');
+end
+
+function testLossIgnoresUnsupervisedClasses(testCase)
+% A class whose mask was absent for an image is unknown, not negative. Whatever
+% the network predicts for it must not move the loss.
+C = 5; w = ones(1, C);
+T = zeros(8, 8, 2*C, 1, 'single');
+T(:, :, 1) = 1;                       % all background
+T(:, :, C+1:C+4) = 1;                 % classes 1..4 supervised, class 5 is not
+
+% The supervised channels are held identical and only the unsupervised one is
+% varied. These are not softmax-normalised, deliberately: taking mass out of
+% class 5 would have to put it into a supervised class, which would change the
+% loss for a legitimate reason and tell us nothing about the masking.
+Y1 = ones(8, 8, C, 1, 'single') * 0.1;
+Y1(:, :, 1) = 0.6;
+Y2 = Y1;
+Y2(:, :, 5) = 0.9;                    % only the unsupervised class differs
+
+l1 = lesion_loss(Y1, T, w, 2, 1.0);   % pure Dice, to isolate the effect
+l2 = lesion_loss(Y2, T, w, 2, 1.0);
+
+verifyEqual(testCase, double(l1), double(l2), 'AbsTol', 1e-6, ...
+    'Predictions on an unsupervised class changed the loss');
+end
+
+function testAbsentClassDoesNotDominateDice(testCase)
+% Regression test for the collapse that pinned training loss at ~0.50.
+%
+% Generalised Dice weights a class by 1/sum(target)^2. A class that is
+% supervised but has no annotated pixels in the batch gives sum = 0, so the
+% weight runs to 1/epsilon = 1e7 against roughly 1e-5 for a class that is
+% present -- a ratio of 1e12. Its intersection is necessarily zero while its
+% denominator grows with whatever the network predicts, so the only way to
+% reduce the loss becomes "predict nothing", and the network collapses to
+% background with the Dice term stuck at 1.0.
+C = 5; w = ones(1, C);
+
+T = zeros(16, 16, 2*C, 1, 'single');
+T(:, :, C+1:2*C) = 1;                 % all classes supervised
+T(:, :, 1) = 1;                       % background everywhere
+T(4:8, 4:8, 1) = 0;
+T(4:8, 4:8, 2) = 1;                   % one real class-2 region
+% classes 3, 4, 5 are supervised but absent from this batch
+
+% A prediction that matches the target well
+Y_good = zeros(16, 16, C, 1, 'single') + 0.01;
+Y_good(:, :, 1) = 0.96;
+Y_good(4:8, 4:8, 1) = 0.01;
+Y_good(4:8, 4:8, 2) = 0.96;
+
+% A prediction that finds nothing, i.e. background everywhere
+Y_blank = zeros(16, 16, C, 1, 'single') + 0.01;
+Y_blank(:, :, 1) = 0.96;
+
+good  = lesion_loss(Y_good,  T, w, 2, 1.0);
+blank = lesion_loss(Y_blank, T, w, 2, 1.0);
+
+verifyLessThan(testCase, double(good), double(blank), ...
+    'A correct prediction must score better than predicting nothing');
+
+% And the good prediction must be meaningfully good, not merely 1.0 - epsilon
+verifyLessThan(testCase, double(good), 0.5, ...
+    'Absent classes are still dominating the Dice term');
+end
+
+function testLossRewardsBetterOverlap(testCase)
+C = 5; w = ones(1, C);
+T = zeros(16, 16, 2*C, 1, 'single');
+T(:, :, C+1:2*C) = 1;
+T(:, :, 1) = 1;
+T(4:12, 4:12, 1) = 0;
+T(4:12, 4:12, 2) = 1;
+
+better = zeros(16, 16, C, 1, 'single') + 0.01;
+better(:, :, 1) = 0.96;
+better(4:12, 4:12, 1) = 0.01;
+better(4:12, 4:12, 2) = 0.96;
+
+worse = zeros(16, 16, C, 1, 'single') + 0.01;
+worse(:, :, 1) = 0.96;
+worse(4:8, 4:8, 1) = 0.01;
+worse(4:8, 4:8, 2) = 0.96;      % only a quarter of the region found
+
+verifyLessThan(testCase, double(lesion_loss(better, T, w, 2, 0.5)), ...
+                         double(lesion_loss(worse,  T, w, 2, 0.5)));
+end
