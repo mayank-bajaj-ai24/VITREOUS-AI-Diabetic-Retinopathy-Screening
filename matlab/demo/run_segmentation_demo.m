@@ -147,6 +147,7 @@ for i = 1:numel(img_files)
 
     % ─── Overlay ─────────────────────────────────────────────────────────
     overlay = render_overlay(canvas, vessels, od, lesions, classes);
+    overlay = overlay_legend(overlay, anatomy_legend(~isempty(lesions)));
 
     [~, bname, ~] = fileparts(img_name);
     out_path = fullfile(output_dir, sprintf('%s_segmentation.png', bname));
@@ -162,6 +163,14 @@ else
     fprintf('Phase 3 segmentation complete.\n');
 end
 fprintf('========================================================\n');
+
+
+function items = anatomy_legend(~)
+% ANATOMY_LEGEND  Key entries for the structural overlays
+items = struct( ...
+    'color', {[0 200 200], [0 255 0], [255 140 0], [255 0 255]}, ...
+    'label', {'vessels', 'optic disc', 'disc exclusion zone', 'fovea'});
+end
 
 
 function overlay = render_overlay(canvas, vessels, od, lesions, classes)
