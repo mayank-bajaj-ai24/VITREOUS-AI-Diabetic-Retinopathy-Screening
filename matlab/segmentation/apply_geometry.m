@@ -44,9 +44,26 @@ y1 = bbox(2);
 x2 = x1 + bbox(3) - 1;
 y2 = y1 + bbox(4) - 1;
 
-% Clamp to the original frame in case the annotation raster differs slightly
+% Clamp to the annotation raster in case it differs slightly from the frame the
+% geometry was built against. Both corners must be clamped: clamping only the
+% far corner and then resizing the shortened crop to the unclamped new_size
+% rescales the mask silently, which is exactly the misalignment this file exists
+% to prevent, and nothing downstream would report an error.
+if x1 > size(A, 2) || y1 > size(A, 1)
+    error('NETRA:GeometryOutsideRaster', ...
+        ['Crop origin [%d %d] lies outside a %dx%d raster. The geometry was ' ...
+         'built for a different image.'], x1, y1, size(A, 1), size(A, 2));
+end
+
 x2 = min(x2, size(A, 2));
 y2 = min(y2, size(A, 1));
+
+if (x2 - x1 + 1) ~= bbox(3) || (y2 - y1 + 1) ~= bbox(4)
+    error('NETRA:GeometryRasterTooSmall', ...
+        ['Raster is %dx%d but the geometry expects a %dx%d crop at [%d %d]. ' ...
+         'Resize the annotation to the source image before transforming it.'], ...
+        size(A, 1), size(A, 2), bbox(4), bbox(3), y1, x1);
+end
 
 cropped = A(y1:y2, x1:x2, :);
 
