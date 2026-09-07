@@ -288,7 +288,9 @@ for r = 1:numel(records)
         entry.dataset    = rec.dataset;
         entry.quality_passed = q.is_passed;
         entry.supervised = supervised;
-        class_supervised_tiles = class_supervised_tiles + double(supervised);
+        if strcmp(split, 'train')
+            class_supervised_tiles = class_supervised_tiles + double(supervised);
+        end
         tiles_meta = [tiles_meta; entry]; %#ok<AGROW>
     end
 
@@ -327,7 +329,7 @@ fprintf('Tiles written    : %d\n', numel(tiles_meta));
 fprintf('\nClass distribution (supervised TRAINING tiles only):\n');
 fprintf('  %-15s %14s %9s  %s\n', 'class', 'pixels', 'share', 'supervised tiles');
 total = sum(class_pixels);
-n_tiles = numel(tiles_meta);
+n_tiles = nnz(strcmp({tiles_meta.split}, 'train'));
 for c = 1:classes.num_classes
     fprintf('  %-15s %14d %8.4f%%  %d/%d\n', classes.names(c), class_pixels(c), ...
         100 * class_pixels(c) / max(total, 1), class_supervised_tiles(c), n_tiles);
