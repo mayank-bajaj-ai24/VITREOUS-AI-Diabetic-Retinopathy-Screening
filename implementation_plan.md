@@ -157,19 +157,20 @@ Raw Fundus Image (APTOS / IDRiD)
 
 ---
 
-### Phase 3 — Retinal Structure & Lesion Segmentation (MATLAB) — [NEXT STEP FOR TEAM ⏳]
+### Phase 3 — Retinal Structure & Lesion Segmentation (MATLAB) — [COMPLETED ✅]
 
 **Purpose:** Extract key anatomical structures and segment clinical DR lesions in MATLAB using Image Processing & Deep Learning Toolboxes.
 
 #### How UNet++ is Handled in MATLAB
 > [!NOTE]
-> **Implementation Options for Teammates:**
-> 1. **Native MATLAB U-Net (`unetLayers`)**: Use MATLAB Deep Learning Toolbox's built-in `unetLayers([512 512 3], 4)` for semantic segmentation.
-> 2. **Custom UNet++ DAG Network**: Construct nested skip-connections using MATLAB `layerGraph()` and Deep Network Designer.
-> 3. **ONNX Import (`importONNXNetwork`)**: Export a trained PyTorch UNet++ model to ONNX (`unetplusplus.onnx`) and load directly into MATLAB using:
->    ```matlab
->    net = importONNXNetwork('unetplusplus.onnx', 'OutputLayerType', 'classification');
->    ```
+> **Option 2 was implemented.** A true nested UNet++ DAG is generated programmatically in `unetpp_layers.m`:
+> `X(i,j) = conv([X(i,0) ... X(i,j-1), up(X(i+1,j-1))])`, giving 15 nodes at depth 4.
+>
+> The other two options were ruled out on inspection:
+> - **`unetLayers`** builds a plain U-Net with one skip per resolution. Calling that UNet++ in the report would not be true.
+> - **`importONNXNetwork`** requires the Deep Learning Toolbox Converter for ONNX add-on, which is **not installed** on the project's MATLAB R2026a (`exist('importONNXNetwork')` returns 0). The PyTorch export route is unavailable.
+>
+> Other R2026a API corrections found while building this phase: `trainNetwork` is legacy and cannot take a custom loss, so `trainnet` is used; `gradcam` is actually `gradCAM`; `efficientnetb4` does not exist and is reached through `imagePretrainedNetwork` (relevant to Phase 4).
 
 #### Components
 - **Optic Disc & Fovea Localization (`locate_optic_disc.m`)** — Circular Hough Transform + intensity peak detection to locate optic disc and calculate foveal coordinates.
@@ -179,13 +180,49 @@ Raw Fundus Image (APTOS / IDRiD)
   - Hemorrhages (blot/flame bleeding)
   - Hard & Soft Exudates (yellow lipid deposits)
 
-#### Proposed MATLAB Files
-- `matlab/segmentation/locate_optic_disc.m` — Circular Hough Transform & intensity centroid localization.
-- `matlab/segmentation/segment_vessels.m` — Frangi filter / matched filter vessel extraction.
-- `matlab/segmentation/unetpp_layers.m` — Builds UNet++ network architecture using MATLAB `unetLayers()` / custom DAG network.
-- `matlab/segmentation/train_lesion_segmentor.m` — Script to train UNet++ on enhanced IDRiD/FGADR dataset using `trainNetwork()`.
-- `matlab/segmentation/segment_lesions.m` — Inference function returning multi-class lesion binary masks.
-- `matlab/tests/test_segmentation.m` — Unit test suite for segmentation routines.
+#### MATLAB Files
+- `matlab/segmentation/locate_optic_disc.m` — Circular Hough + intensity, with vessel convergence folded into the candidate map. [COMPLETED ✅]
+- `matlab/segmentation/segment_vessels.m` — Multiscale Frangi (`fibermetric`) with hysteresis thresholding. [COMPLETED ✅]
+- `matlab/segmentation/unetpp_layers.m` — Nested UNet++ DAG as a `dlnetwork`. [COMPLETED ✅]
+- `matlab/segmentation/train_lesion_segmentor.m` — Trains via `trainnet` with a custom loss. [COMPLETED ✅]
+- `matlab/segmentation/segment_lesions.m` — Inference returning multi-class lesion masks. [COMPLETED ✅]
+- `matlab/tests/test_segmentation.m` — 38 unit tests. [COMPLETED ✅]
+
+Supporting files added while building the phase:
+- `matlab/segmentation/prepare_lesion_dataset.m` — Applies the section 3 data flow rule to IDRiD: Phase 1 gate, Phase 2 enhancement, and the identical crop-and-letterbox geometry replayed onto every lesion mask.
+- `matlab/segmentation/fundus_geometry.m`, `apply_geometry.m`, `invert_geometry.m`, `canvas_valid_mask.m` — The Phase 2 to Phase 3 geometry contract. Verified bit-identical to the Phase 2 output path.
+- `matlab/segmentation/lesion_loss.m` — Focal cross-entropy plus generalised Dice, masked per pixel and per class.
+- `matlab/segmentation/lesion_classes.m` — Single source of truth for the 5-class scheme.
+- `matlab/segmentation/estimate_fov_mask.m`, `tile_image.m`, `stitch_tiles.m`
+- `matlab/demo/run_training.m`, `matlab/demo/run_segmentation_demo.m`
+
+#### Measured Results
+
+Dataset: all 81 IDRiD segmentation images through Phase 1 and Phase 2 to enhanced 512×512, split 65 train / 16 validation by image. **Zero quality-gate rejections** after the `check_fov` fix below.
+
+Model: UNet++ depth 4, 32 base filters equivalent width 16, 2.3M parameters, trained on CPU in 144.6 minutes. Converged on the validation criterion rather than exhausting its epoch budget.
+
+| Lesion class | Dice | Precision | Recall |
+|---|---|---|---|
+| Microaneurysms | 0.4742 | 0.468 | 0.481 |
+| Haemorrhages | 0.4724 | 0.597 | 0.391 |
+| Hard exudates | 0.5961 | 0.630 | 0.566 |
+| Soft exudates | 0.6799 | 0.594 | 0.794 |
+
+Optic disc suppression raises hard exudate precision from 0.616 to 0.630 with **no loss of recall** — across all 16 validation images, zero ground-truth exudate pixels fall inside the exclusion zone.
+
+#### Known Limitations
+- **65 training images.** The binding constraint. Section 3 Step C already calls for FGADR; **DDR** (757 pixel-annotated images, free, no access agreement, already in `datasets.ddr`) is the faster route to the same fix.
+- **No healthy retinas.** IDRiD's segmentation subset is by construction 81 diseased eyes, so the model has never seen a normal fundus. This is a specificity risk against the ≥85% target and cannot be fixed by more training.
+- **Haemorrhage recall is 0.391**, so haemorrhage burden is under-reported. Haemorrhages help separate Moderate from Severe NPDR, so this understates severity.
+- **Soft exudate is scored on only 7 of 16 validation images**; that figure has the widest error bars.
+- **41 of 81 IDRiD images have no soft exudate mask** and one has no haemorrhage mask. These are recorded per image and masked out of the loss, but the affected pixels remain labelled background, so a residual bias against soft exudates persists.
+
+#### Phase 1 and Phase 2 Issues Found
+- **`check_fov` rejected 79 of 81 IDRiD images.** Otsu split the retina's own intensity range rather than retina against surround (on IDRiD_04, coverage measured 0.526 against a true aperture of 0.795), and the 0.70 coverage floor sat just above IDRiD's entire distribution. Fixed: fixed low threshold, floor lowered to 0.60. Verified no verdict change on any pre-existing image.
+- **`apply_clahe` does not mask CLAHE to the field of view**, lifting green in the black surround from 0 to ~19/255. Phase 3 was made robust to it; the root fix belongs in Phase 2 and also affects Phase 4's inputs.
+- **`overexposed_input.png` passes the quality gate** (mean brightness 164–192 against a `brightness_max` of 220). Pre-existing, untouched.
+- **`testExposureCheckNormal` and `testCLAHE` fail on main.** Both are test-code bugs, not source bugs.
 
 ---
 
@@ -276,12 +313,22 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 │   │   ├── select_profile.m
 │   │   ├── compute_metrics.m
 │   │   └── enhance_fundus.m
-│   ├── segmentation/                   # Phase 3: Structure & Lesion Segmentation [NEXT ⏳]
+│   ├── segmentation/                   # Phase 3: Structure & Lesion Segmentation [DONE ✅]
 │   │   ├── locate_optic_disc.m
 │   │   ├── segment_vessels.m
 │   │   ├── unetpp_layers.m
 │   │   ├── train_lesion_segmentor.m
-│   │   └── segment_lesions.m
+│   │   ├── segment_lesions.m
+│   │   ├── prepare_lesion_dataset.m
+│   │   ├── lesion_loss.m
+│   │   ├── lesion_classes.m
+│   │   ├── fundus_geometry.m
+│   │   ├── apply_geometry.m
+│   │   ├── invert_geometry.m
+│   │   ├── canvas_valid_mask.m
+│   │   ├── estimate_fov_mask.m
+│   │   ├── tile_image.m
+│   │   └── stitch_tiles.m
 │   ├── classification/                 # Phase 4: DR Severity Grading
 │   │   ├── build_hybrid_model.m
 │   │   ├── train_dr_classifier.m
@@ -301,7 +348,7 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 │   └── tests/
 │       ├── test_quality_gate.m         # Phase 1 tests [DONE ✅]
 │       ├── test_enhancement.m          # Phase 2 tests [DONE ✅]
-│       ├── test_segmentation.m         # Phase 3 tests
+│       ├── test_segmentation.m         # Phase 3 tests [DONE ✅]
 │       └── test_classification.m       # Phase 4 tests
 ├── configs/
 │   └── default_config.yaml             # Shared project config
@@ -318,7 +365,7 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 |---|---|---|---|---|
 | **Phase 1** | Quality Gate | Mayank & Krrish | `quality_gate.m`, `check_focus.m`, `check_exposure.m`, `check_fov.m`, `recapture_alert.m` | **COMPLETED ✅** |
 | **Phase 2** | Preprocessing & Enhancement | Mayank & Krrish | `enhance_fundus.m`, `crop_fundus_roi.m`, `apply_clahe.m`, `apply_nlm_denoising.m`, `standardize_image.m` | **COMPLETED ✅** |
-| **Phase 3** | Lesion & Vessel Segmentation | Next Teammate | `segment_vessels.m`, `locate_optic_disc.m`, `segment_lesions.m` (UNet++ via `unetLayers` / `importONNXNetwork`) | **READY TO START ⏳** |
+| **Phase 3** | Lesion & Vessel Segmentation | Dhruv | `segment_vessels.m`, `locate_optic_disc.m`, `segment_lesions.m`, `unetpp_layers.m`, `train_lesion_segmentor.m` (nested UNet++ DAG) | **COMPLETED ✅** |
 | **Phase 4** | DR Severity Grading | Next Teammate | `build_hybrid_model.m`, `grade_dr_severity.m` (ResNet50 + EfficientNet via `resnet50` / `efficientnetb4`) | **PLANNED ⏳** |
 | **Phase 5** | XAI, GUI & SimEvents | Team | `generate_gradcam.m`, `clinic_flow_simulation.slx`, `NETRA_App.mlapp` | **PLANNED ⏳** |
 
