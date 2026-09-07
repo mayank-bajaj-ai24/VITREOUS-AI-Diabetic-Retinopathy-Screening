@@ -39,6 +39,31 @@ function result = segment_lesions(image_input, net, cfg, options)
 %                               microaneurysm is only a few pixels across, so a
 %                               size filter tuned for exudates erases the
 %                               earliest sign of disease.
+%       .ClassBias            - Per-class multiplier applied to the softmax
+%                               probabilities before the argmax, length equal to
+%                               the number of classes. Empty (default) leaves the
+%                               decision unchanged.
+%
+%                               A plain argmax is one fixed operating point, and
+%                               it is rarely the right one for every class at
+%                               once. Missing a haemorrhage understates severity,
+%                               while an extra flagged exudate costs a second
+%                               look, so the two classes do not want the same
+%                               precision-recall trade. Biasing the
+%                               probabilities shifts each class's decision
+%                               boundary without retraining. Fit these on
+%                               training data, never on the set used to report.
+%
+%                               Measured on the 81 image IDRiD set and NOT
+%                               adopted: biases fitted on the 65 training images
+%                               raised training Dice for haemorrhages from 0.406
+%                               to 0.477 and hard exudates from 0.617 to 0.645,
+%                               but on the 16 held-out images mean lesion Dice
+%                               fell from 0.5629 to 0.5554. The fitted values
+%                               reached 6.0, which is the signature of fitting
+%                               noise. The technique is sound; 65 images is too
+%                               few to fit an operating point that generalises.
+%                               Worth revisiting once DDR or FGADR is added.
 %       .Probabilities        - Return the full probability volume (default false)
 %
 %   Outputs:
@@ -59,6 +84,7 @@ if nargin < 4
 end
 defaults = struct( ...
     'Enhanced',             false, ...
+    'ClassBias',            [], ...
     'OpticDiscSuppression', true, ...
     'VesselSuppression',    false, ...
     'MinLesionArea',        0, ...
@@ -129,7 +155,19 @@ end
 % not appear as discontinuities in the lesion map.
 probabilities = stitch_tiles(probs, positions, [canvas_size, canvas_size], true);
 
-[~, label_map] = max(probabilities, [], 3);
+if ~isempty(options.ClassBias)
+    bias = options.ClassBias(:)';
+    if numel(bias) ~= classes.num_classes
+        error('NETRA:BadClassBias', ...
+            'ClassBias has %d entries but there are %d classes.', ...
+            numel(bias), classes.num_classes);
+    end
+    biased = probabilities .* reshape(bias, 1, 1, []);
+else
+    biased = probabilities;
+end
+
+[~, label_map] = max(biased, [], 3);
 label_map = uint8(label_map);
 
 % ─── Restrict to imaged retina ───────────────────────────────────────────
