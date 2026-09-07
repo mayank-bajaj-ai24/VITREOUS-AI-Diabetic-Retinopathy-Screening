@@ -20,12 +20,22 @@ quality_gate:
 
   fov:
     surround_threshold: 10            # Grayscale level separating black surround from retina
-    coverage_min: 0.60                # Minimum fraction of frame covered by retina
+    coverage_min: 0.35                # Loose sanity floor, NOT a quality bar
     centering_max_offset: 0.15        # Max centroid offset from center (fraction of image)
-    # coverage_min was 0.70, which rejected 79 of 81 IDRiD images. Measured
-    # aperture coverage: IDRiD 0.690-0.796, APTOS samples 0.746-0.833, and a
-    # deliberately cut-off capture 0.173. 0.60 clears every legitimate capture
-    # and still separates them from a genuine framing failure by a wide margin.
+    # Coverage is the fraction of the rectangular frame filled by the circular
+    # retina, so it measures the camera's framing convention rather than image
+    # quality. Measured aperture coverage by source:
+    #     DDR    0.433 - 0.719
+    #     IDRiD  0.690 - 0.796
+    #     APTOS  0.745 - 0.833
+    # At 0.70 it rejected 79 of 81 IDRiD images; at 0.60 it rejected 71% of DDR.
+    # Chasing it per dataset treats the symptom. The check that actually detects
+    # a cut-off fundus is centering: a deliberately cut-off capture measures
+    # offset 0.617 against 0.000-0.062 for every legitimate image across all
+    # three sources, so the 0.15 threshold separates them by a factor of four
+    # and does so independently of the camera.
+    # coverage_min is therefore a floor that catches gross failures only. The
+    # cut-off capture measures 0.172, well clear of DDR's 0.433 minimum.
 
 # ─── Enhancement Parameters (Phase 2) ───
 enhancement:
