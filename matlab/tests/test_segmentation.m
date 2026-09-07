@@ -462,3 +462,133 @@ function testTileImageRejectsOversizedTile(testCase)
 verifyError(testCase, @() tile_image(ones(100, 100, 3), 256, 32), ...
     'NETRA:TileTooLarge');
 end
+
+% ─── Lesion segmentation inference ────────────────────────────────────────
+%
+% These exercise the inference path, not the model. The network is untrained,
+% so its predictions are arbitrary; what is under test is that the plumbing
+% around it is correct -- geometry, masking, suppression and reporting. No
+% accuracy claim can or should be read from these.
+
+function testSegmentLesionsOutputContract(testCase)
+[cfg, net, img] = inference_fixture(testCase);
+r = segment_lesions(img, net, cfg);
+
+classes = lesion_classes();
+verifySize(testCase, r.label_map, [cfg.segmentation.input_size, cfg.segmentation.input_size]);
+verifyEqual(testCase, class(r.label_map), 'uint8');
+
+% One mask and one stats entry per lesion class, and nothing for background
+for c = classes.lesion_ids
+    name = char(classes.names(c));
+    verifyTrue(testCase, isfield(r.masks, name), sprintf('missing mask %s', name));
+    verifyTrue(testCase, islogical(r.masks.(name)));
+    verifyTrue(testCase, isfield(r.stats, name));
+    verifyGreaterThanOrEqual(testCase, r.stats.(name).area_fraction, 0);
+    verifyLessThanOrEqual(testCase, r.stats.(name).area_fraction, 1);
+end
+verifyFalse(testCase, isfield(r.masks, 'background'));
+
+% Label values must stay within the declared scheme
+verifyTrue(testCase, all(ismember(unique(r.label_map(:)), uint8(0:classes.num_classes))));
+end
+
+function testSegmentLesionsNeverReportsOutsideTheRetina(testCase)
+% A lesion predicted in the black surround is meaningless, and would inflate
+% every area statistic the clinical report is built from.
+[cfg, net, img] = inference_fixture(testCase);
+r = segment_lesions(img, net, cfg);
+
+classes = lesion_classes();
+outside = r.label_map == 0;
+for c = classes.lesion_ids
+    name = char(classes.names(c));
+    verifyEqual(testCase, nnz(r.masks.(name) & outside), 0, ...
+        sprintf('%s reported outside the retina', name));
+end
+end
+
+function testOpticDiscSuppressionRemovesBrightLesionsOnTheDisc(testCase)
+% The disc is the archetypal hard exudate false positive: bright, round and
+% yellow-white on every patient. Nothing bright may survive inside its zone.
+[cfg, net, img] = inference_fixture(testCase);
+
+on  = segment_lesions(img, net, cfg, struct('OpticDiscSuppression', true));
+off = segment_lesions(img, net, cfg, struct('OpticDiscSuppression', false));
+
+zone = on.optic_disc.exclusion_mask;
+
+verifyEqual(testCase, nnz(on.masks.hard_exudate & zone), 0);
+verifyEqual(testCase, nnz(on.masks.soft_exudate & zone), 0);
+
+% Dark classes must be untouched there: haemorrhages on the neuroretinal rim
+% are real disease and suppressing them would hide it.
+verifyEqual(testCase, nnz(on.masks.haemorrhage & zone), ...
+                      nnz(off.masks.haemorrhage & zone));
+
+verifyEqual(testCase, on.suppressed.optic_disc, ...
+            nnz(ismember(off.label_map, uint8([4 5])) & zone));
+end
+
+function testVesselSuppressionIsOffByDefault(testCase)
+% Haemorrhages genuinely lie along vessels, so this must never be silently on.
+[cfg, net, img] = inference_fixture(testCase);
+r = segment_lesions(img, net, cfg);
+verifyEqual(testCase, r.suppressed.vessels, 0);
+end
+
+function testSegmentLesionsRefusesUngradeableImages(testCase)
+% Reporting lesions on an image Phase 1 rejected defeats the point of Phase 1.
+cfg = testCase.TestData.cfg;
+cfg.segmentation.input_size = 256;
+cfg.segmentation.tile_size  = 256;
+net = initialize(unetpp_layers([256 256 3], 5, ...
+    struct('BaseFilters', 4, 'Depth', 3)));
+
+% A mostly-black frame fails FOV coverage
+bad = zeros(400, 400, 3, 'uint8');
+bad(180:220, 180:220, :) = 200;
+
+verifyError(testCase, @() segment_lesions(bad, net, cfg), ...
+    'NETRA:QualityGateFailed');
+end
+
+function testSegmentLesionsRejectsWrongSizedEnhancedInput(testCase)
+cfg = testCase.TestData.cfg;
+cfg.segmentation.input_size = 256;
+cfg.segmentation.tile_size  = 256;
+net = initialize(unetpp_layers([256 256 3], 5, ...
+    struct('BaseFilters', 4, 'Depth', 3)));
+
+verifyError(testCase, ...
+    @() segment_lesions(zeros(128, 128, 3, 'uint8'), net, cfg, ...
+                        struct('Enhanced', true)), ...
+    'NETRA:CanvasSizeMismatch');
+end
+
+function testMinLesionAreaFiltersSmallRegions(testCase)
+[cfg, net, img] = inference_fixture(testCase);
+
+none = segment_lesions(img, net, cfg, struct('MinLesionArea', 0));
+big  = segment_lesions(img, net, cfg, struct('MinLesionArea', 50));
+
+classes = lesion_classes();
+for c = classes.lesion_ids
+    name = char(classes.names(c));
+    verifyLessThanOrEqual(testCase, nnz(big.masks.(name)), nnz(none.masks.(name)));
+end
+verifyGreaterThanOrEqual(testCase, big.suppressed.min_area, 0);
+end
+
+function [cfg, net, img] = inference_fixture(testCase)
+% A small canvas and a tiny network keep these tests fast; the code path is
+% identical to the 512 production configuration.
+cfg = testCase.TestData.cfg;
+cfg.segmentation.input_size = 256;
+cfg.segmentation.tile_size  = 256;
+
+net = initialize(unetpp_layers([256 256 3], lesion_classes().num_classes, ...
+    struct('BaseFilters', 4, 'Depth', 3)));
+
+img = synthetic_fundus(640);
+end

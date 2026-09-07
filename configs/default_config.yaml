@@ -64,15 +64,19 @@ enhancement:
     # Above medium_threshold → low enhancement
 
 # ─── Segmentation (Phase 3) ───
-# The segmentation track runs at a larger canvas than the grading track.
-# A microaneurysm is roughly 20-30 px across in a native fundus capture; at the
-# 512 grading canvas that shrinks to about 4 px, which no encoder-decoder can
-# recover after its first pooling stage. Segmentation therefore standardises to
-# 1024 and is fed to the network as overlapping 512 tiles.
+# Per the master implementation plan section 3, every dataset flows:
+#   Raw -> Phase 1 Quality Gate -> Phase 2 Enhancement -> Enhanced 512x512
+# and that enhanced 512x512 set is what trains UNet++. The segmentation track
+# therefore uses the same canvas as the grading track, so one enhanced dataset
+# serves both Phase 3 and Phase 4.
+#
+# tile_size equal to input_size means one sample per image and no tiling; the
+# tiling machinery stays in place so a larger canvas can be introduced later
+# without changing the pipeline.
 segmentation:
-  input_size: 1024                    # Canvas for the segmentation track
-  tile_size: 512                      # Patch actually fed to UNet++
-  tile_overlap: 128                   # Overlap between adjacent tiles
+  input_size: 512                     # Enhanced canvas, per plan section 3
+  tile_size: 512                      # Equal to input_size => no tiling
+  tile_overlap: 128                   # Only applies if input_size > tile_size
   num_classes: 5                      # background + MA + HE + EX + SE
 
   # Vessel extraction. Calibres are fractions of field-of-view diameter, not
