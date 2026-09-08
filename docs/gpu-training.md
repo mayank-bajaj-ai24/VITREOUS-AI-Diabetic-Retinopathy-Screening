@@ -7,6 +7,47 @@ Apple Silicon GPUs go unused and a Mac always trains on CPU.
 Nothing in the code needs changing. `run_training` sets
 `ExecutionEnvironment` to `auto` and prints which device it selected.
 
+## Where these commands run
+
+Not on a Mac. MATLAB accelerates only through NVIDIA CUDA, so `--gpus all` has
+nothing to attach to on Apple Silicon and the container would fall back to CPU,
+which is slower than simply running MATLAB natively.
+
+Everything below runs on a **separate machine that has an NVIDIA GPU**, reached
+over SSH. The sequence is:
+
+```
+[your machine]                     [GPU machine]
+  tar the prepared data  --scp-->    extract
+                                     docker run ...    <- here
+                                     run_training
+  copy the model back    <--scp--    ~20 minutes later
+  run_model_comparison
+```
+
+Obtain that machine before anything else. A teammate's desktop with an RTX card
+is free and avoids Docker altogether, since MATLAB can simply be installed on it
+under the institutional licence. Rent one only if nobody has one.
+
+### Renting one on AWS
+
+Launch a `g4dn.xlarge` using the **Deep Learning Base OSS Nvidia Driver AMI**.
+That image ships the NVIDIA drivers and the container toolkit already
+configured, which is the part that otherwise consumes an afternoon.
+
+```bash
+# on your machine
+tar czf netra-gpu.tar.gz matlab configs data/processed/segmentation
+scp -i key.pem netra-gpu.tar.gz ubuntu@<instance-ip>:~/
+
+# on the instance
+ssh -i key.pem ubuntu@<instance-ip>
+mkdir netra && tar xzf netra-gpu.tar.gz -C netra
+```
+
+Then run one of the container commands below. Remember to terminate the
+instance afterwards; it bills per hour whether or not anything is running.
+
 ## What to move
 
 Only the prepared dataset and the repo. The raw IDRiD and DDR archives (2 GB)
