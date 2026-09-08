@@ -79,6 +79,21 @@ else
         nnz(strcmp({L.manifest.tiles.split}, 'test')));
 end
 
+% ─── Keep the machine usable ─────────────────────────────────────────────
+% MATLAB will otherwise take every core for the maths, and the background
+% preprocessing worker is a further process on top of that. Leaving a couple of
+% cores free costs some training speed and keeps the desktop responsive.
+% Set to [] to let MATLAB use everything.
+compute_threads = max(1, feature('numcores') - 2);
+
+if ~isempty(compute_threads)
+    maxNumCompThreads(compute_threads);
+    fprintf('Compute threads : %d of %d cores (2 left for other work)\n', ...
+        compute_threads, feature('numcores'));
+else
+    fprintf('Compute threads : all %d cores\n', feature('numcores'));
+end
+
 % ─── Training settings ───────────────────────────────────────────────────
 % Edit these. Everything else comes from configs/default_config.yaml.
 options = struct( ...
