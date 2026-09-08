@@ -92,6 +92,9 @@ options = struct( ...
     'Augment',              true, ...
     'ExecutionEnvironment', 'auto', ... % uses a CUDA GPU when one exists
     'Plots',                'training-progress', ...  % live curve in the desktop
+    'PreprocessingEnvironment', 'background', ... % data prep off the training
+                                    ... % thread; on CPU this pipeline is bound
+                                    ... % by data prep, not by the convolutions
     'OutputFile',           fullfile(data_dir, 'unetpp_lesion.mat'));
 
 fprintf('BaseFilters %d, Depth %d, %d epochs, batch %d, lr %g, %s\n', ...
