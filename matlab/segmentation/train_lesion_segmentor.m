@@ -51,6 +51,24 @@ function [net, results] = train_lesion_segmentor(data_dir, cfg, options)
 %       .DiceWeight      - Weight on the Dice term (default 0.5)
 %       .ClassWeightExponent - Exponent on inverse frequency for the
 %                          cross-entropy class weights (default 0.5)
+%       .ClassWeightMode - 'balanced' (default) or 'inverse-sqrt'.
+%
+%                          'inverse-sqrt' weights every class by inverse
+%                          frequency, which assumes rarer means harder. For
+%                          haemorrhages that is false: they are the most common
+%                          lesion and also the hardest, being dark red blots on
+%                          a tree of dark red vessels. Trained on IDRiD plus DDR
+%                          that assumption handed haemorrhage the lowest weight
+%                          of any lesion, 0.610 against 2.168 for
+%                          microaneurysms, and the class collapsed -- its output
+%                          probability never exceeded 0.386 anywhere, so it
+%                          never won the argmax and scored Dice 0.000.
+%
+%                          'balanced' keeps background down-weighted, which is
+%                          the imbalance that genuinely needs correcting, but
+%                          gives the four lesion classes equal weight. A
+%                          haemorrhage is not less important than a
+%                          microaneurysm for being more common.
 %       .Augment         - Random flips and 90 degree rotations (default true)
 %       .ExecutionEnvironment - 'auto' (default), 'cpu' or 'gpu'
 %       .LearnRateSchedule - 'piecewise' (default) or 'none'. Use 'none' for
@@ -85,6 +103,7 @@ defaults = struct( ...
     'FocalGamma',           2, ...
     'DiceWeight',           0.5, ...
     'ClassWeightExponent',  0.5, ...
+    'ClassWeightMode',      'balanced', ...
     'Augment',              true, ...
     'ExecutionEnvironment', 'auto', ...
     'LearnRateSchedule',    'piecewise', ...
@@ -129,17 +148,23 @@ val_ds   = build_datastore(fullfile(data_dir, 'val'), classes, ...
 % haemorrhages and drives the background weight to zero, so the network is
 % never penalised for painting lesions across healthy retina.
 %
-% The cross-entropy term instead uses inverse frequency raised to
-% ClassWeightExponent (0.5 by default) and normalised to unit mean. That still
-% favours microaneurysms about 80-fold over background, but keeps the four
-% lesion classes within a small factor of each other.
+% The cross-entropy term uses inverse frequency raised to ClassWeightExponent,
+% normalised to unit mean, which correctly pushes the vast background down.
 freq = manifest.class_pixels / max(sum(manifest.class_pixels), 1);
 freq = max(freq, 1e-6);
 class_weights = (1 ./ freq).^options.ClassWeightExponent;
 class_weights = class_weights / mean(class_weights);
 class_weights = min(class_weights, 1e3);
 
-fprintf('Class weights:\n');
+if strcmpi(options.ClassWeightMode, 'balanced')
+    % Ranking the lesions against each other by rarity is the part that does
+    % harm, because rarity is not difficulty. Background keeps the weight
+    % inverse frequency gives it; the lesions are levelled to their mean.
+    lesion_w = class_weights(classes.lesion_ids);
+    class_weights(classes.lesion_ids) = mean(lesion_w);
+end
+
+fprintf('Class weights (%s):\n', options.ClassWeightMode);
 for c = 1:classes.num_classes
     fprintf('  %-15s freq %8.5f%%  weight %10.2f\n', ...
         classes.names(c), 100 * freq(c), class_weights(c));

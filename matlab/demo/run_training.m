@@ -90,13 +90,23 @@ options = struct( ...
     'MiniBatchSize',        8, ...
     'LearnRate',            1e-3, ...
     'Augment',              true, ...
-    'ExecutionEnvironment', 'cpu', ...  % 'auto' on a CUDA machine
+    'ExecutionEnvironment', 'auto', ... % uses a CUDA GPU when one exists
     'Plots',                'training-progress', ...  % live curve in the desktop
     'OutputFile',           fullfile(data_dir, 'unetpp_lesion.mat'));
 
-fprintf('BaseFilters %d, Depth %d, %d epochs, batch %d, lr %g, %s\n\n', ...
+fprintf('BaseFilters %d, Depth %d, %d epochs, batch %d, lr %g, %s\n', ...
     options.BaseFilters, options.Depth, options.MaxEpochs, ...
     options.MiniBatchSize, options.LearnRate, options.ExecutionEnvironment);
+
+% Say plainly which device will be used. MATLAB accelerates only through NVIDIA
+% CUDA, so an Apple Silicon GPU is not used and silently falling back to CPU
+% turns a twenty minute run into an eight hour one.
+if gpuDeviceCount > 0
+    g = gpuDevice;
+    fprintf('GPU: %s, %.1f GB\n\n', g.Name, g.TotalMemory / 1e9);
+else
+    fprintf('GPU: none detected, training on CPU\n\n');
+end
 
 % ─── Train ───────────────────────────────────────────────────────────────
 t0 = tic;
