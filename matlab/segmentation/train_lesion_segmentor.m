@@ -76,6 +76,23 @@ function [net, results] = train_lesion_segmentor(data_dir, cfg, options)
 %                          long run will decay the rate to nothing before a
 %                          short one has learned anything.
 %       .LearnRateDropPeriod - Epochs between drops. Defaults to MaxEpochs/4.
+%       .PreprocessingEnvironment - 'serial' (default), 'background' or
+%                          'parallel'.
+%
+%                          On CPU this pipeline is bound by data preparation
+%                          rather than by the convolutions. Each sample is read
+%                          from PNG, converted, augmented and one-hot encoded
+%                          into a 512x512x10 single array, roughly 2.6 MB
+%                          allocated per sample, all on one thread while the
+%                          compute threads wait. A 431 image run was observed
+%                          using about 190% CPU of a possible 800%.
+%
+%                          'background' overlaps that work with training using
+%                          one extra worker, and 'parallel' spreads it across a
+%                          pool. Both need Parallel Computing Toolbox, and both
+%                          hold additional copies of the mini-batch in memory,
+%                          so on a 16 GB machine 'background' is the safer of
+%                          the two.
 %       .Plots           - 'none' (default) or 'training-progress' for the live
 %                          loss curve. Use the latter when running in the MATLAB
 %                          desktop; it needs a display, so leave it 'none' for
@@ -109,6 +126,7 @@ defaults = struct( ...
     'LearnRateSchedule',    'piecewise', ...
     'LearnRateDropPeriod',  [], ...
     'Plots',                'none', ...
+    'PreprocessingEnvironment', 'serial', ...
     'OutputFile',           '');
 fn = fieldnames(defaults);
 for i = 1:numel(fn)
@@ -205,7 +223,8 @@ train_opts = trainingOptions('adam', ...
     'LearnRateDropPeriod',    drop_period, ...
     'ExecutionEnvironment',   options.ExecutionEnvironment, ...
     'Verbose',                true, ...
-    'Plots',                  options.Plots);
+    'Plots',                  options.Plots, ...
+    'PreprocessingEnvironment', options.PreprocessingEnvironment);
 
 loss_fcn = @(Y, T) lesion_loss(Y, T, class_weights, ...
                                options.FocalGamma, options.DiceWeight);
