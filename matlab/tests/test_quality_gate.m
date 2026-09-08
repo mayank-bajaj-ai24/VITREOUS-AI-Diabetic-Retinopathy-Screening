@@ -29,9 +29,29 @@ verifyEqual(testCase, res.fail_code, 'FAIL_BLUR');
 end
 
 function testExposureCheckNormal(testCase)
-img = uint8(ones(100, 100) * 130);
+% A well-exposed image has both a sensible mean and a spread of intensities.
+% The previous version used a perfectly uniform grey field, whose Shannon
+% entropy is 0, so it could never pass the entropy floor: the production check
+% was right and the phantom was degenerate.
+rng(0);
+img = uint8(min(max(130 + 25 * randn(100, 100), 0), 255));
+
 res = check_exposure(img, [], testCase.TestData.cfg);
+
 verifyTrue(testCase, res.passed);
+verifyEqual(testCase, res.fail_code, '');
+verifyEqual(testCase, res.mean_brightness, 130, 'AbsTol', 5);
+end
+
+function testExposureCheckFlatFieldHasNoInformation(testCase)
+% A uniform field carries no image information at all and must be rejected,
+% however comfortable its mean brightness looks.
+img = uint8(ones(100, 100) * 130);
+
+res = check_exposure(img, [], testCase.TestData.cfg);
+
+verifyFalse(testCase, res.passed);
+verifyEqual(testCase, res.entropy, 0, 'AbsTol', 1e-9);
 end
 
 function testExposureCheckUnderexposed(testCase)
