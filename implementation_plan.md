@@ -202,26 +202,42 @@ All figures below are Dice on **378 images held out from every model compared**,
 drawn from IDRiD and DDR. Numbers printed during training use each run's own
 validation split and are not comparable between runs.
 
-| Model | Training data | MA | HE | EX | SE | Mean |
+| Model | Training data and change | MA | HE | EX | SE | Mean |
 |---|---|---|---|---|---|---|
-| v1 | IDRiD, 65 images | 0.140 | 0.209 | 0.057 | 0.255 | 0.165 |
-| v2 | IDRiD + DDR, 431 images | 0.314 | **0.000** | 0.429 | 0.436 | **0.295** |
-| v3 | as v2, balanced class weights | 0.308 | 0.169 | 0.352 | 0.310 | 0.285 |
+| v1 | IDRiD, 65 images, scratch encoder | 0.140 | 0.209 | 0.057 | 0.255 | 0.165 |
+| v2 | + DDR, 431 images, official splits | 0.314 | 0.000 | 0.429 | 0.436 | 0.295 |
+| v3 | + balanced class weights | 0.308 | 0.169 | 0.352 | 0.310 | 0.285 |
+| **v4** | **+ pretrained ResNet-18 encoder, 60 epochs** | **0.332** | **0.408** | **0.472** | **0.454** | **0.412** |
 
-**v3 is the recommended model** despite v2's marginally higher mean. v2 cannot
-report a haemorrhage at all: the class collapsed to zero. Haemorrhage burden is
-part of what separates Moderate from Severe NPDR, so v2 would systematically
-under-grade the patients most in need of referral. A 0.010 difference in mean
-Dice over 378 images is within noise; a dead class is not.
+**v4 is the recommended model**, best on every class. Precision improved
+throughout (microaneurysm 0.26 to 0.31, haemorrhage 0.43 to 0.52, soft exudate
+0.30 to 0.53) while haemorrhage recall roughly tripled, so the gain is broad
+rather than a trade between metrics. It is also one of only two runs to stop on
+the validation criterion rather than exhausting its epoch budget.
+
+Its remaining weakness is recall: soft exudate fell from v1's 0.551 to 0.398 and
+microaneurysm sits at 0.316. For screening, a miss costs more than a false
+alarm, so trading some of v4's improved precision back for recall is the
+clearest remaining tuning target.
 
 Two findings worth carrying forward:
 
-- **Training data is the lever that works.** 65 to 431 images raised mean Dice
-  from 0.165 to 0.295, a 78% gain. Every loss-weighting change since has moved
-  it by hundredths, and v2 to v3 was a trade rather than a gain.
-- **No model has been trained to convergence.** v2 and v3 both stopped on "max
-  epochs completed" with validation loss still falling. Their reported figures
-  are floors, not ceilings.
+- **Data and transfer learning are the levers that work.** Adding DDR took mean
+  Dice from 0.165 to 0.295; the pretrained encoder took it from 0.285 to 0.412.
+  Three runs spent on loss weighting moved it by hundredths, and one of those
+  was a trade rather than a gain.
+- **The plan asked for a ResNet encoder from the start.**
+  `models.segmentation.backbone` was `"resnet34"`, and building the encoder from
+  scratch was an unflagged deviation that cost three runs to discover. MATLAB
+  ships no ResNet-34, so ResNet-18 stands in.
+- **Validation loss is a poor guide to per-class quality here.** The generalised
+  Dice term weights by inverse square frequency and is therefore dominated by
+  microaneurysms, the rarest class. v4's loss curve looked no better than v3's
+  while its Dice was 34% higher, because the classes that improved contribute
+  least to the loss.
+- **Training on a GPU changes what is affordable.** The same run is roughly
+  eight hours on the project's CPU and under two on a free Colab T4, which turns
+  one experiment a night into several a day. See docs/colab-training.md.
 
 #### Superseded Results
 
