@@ -35,7 +35,30 @@ function [net, info] = unetpp_layers(inputSize, numClasses, options)
 %     inputSize  - [h, w, c] network input, e.g. [512 512 3]
 %     numClasses - Number of output classes including background
 %     options    - Optional struct:
-%       .BaseFilters     - Filters at depth 0, doubling per level (default 32)
+%       .Encoder         - 'scratch' (default) or 'resnet18'.
+%
+%                          'scratch' builds the encoder from the paper's plain
+%                          double-conv blocks, initialised randomly.
+%
+%                          'resnet18' substitutes a ResNet-18 encoder
+%                          pretrained on ImageNet, which is what the project
+%                          config asks for ("backbone: resnet34"; MATLAB does
+%                          not ship ResNet-34, so 18 is the nearest available).
+%                          The nested decoder is unchanged, so this remains
+%                          UNet++: only the j = 0 column is substituted, which
+%                          is standard practice for the architecture.
+%
+%                          With 431 training images, learning edges and
+%                          textures from random initialisation is the hard way
+%                          to spend the data. A pretrained encoder starts
+%                          already knowing them, leaving the model to learn
+%                          only what a lesion looks like.
+%
+%                          Requires the Deep Learning Toolbox Model for
+%                          ResNet-18 Network support package.
+%       .BaseFilters     - Filters at depth 0, doubling per level (default 32).
+%                          Ignored for 'resnet18', whose widths are fixed by the
+%                          pretrained weights.
 %       .Depth           - Number of downsampling levels (default 4)
 %       .DeepSupervision - Attach a head to every X(0,j) (default false).
 %                          Gives a multi-output network; the training script
@@ -56,6 +79,7 @@ if nargin < 3
 end
 
 defaults = struct( ...
+    'Encoder',         'scratch', ...
     'BaseFilters',     32, ...
     'Depth',           4, ...
     'DeepSupervision', false, ...
@@ -84,32 +108,45 @@ if mod(inputSize(1), 2^L) ~= 0 || mod(inputSize(2), 2^L) ~= 0
         inputSize(1), inputSize(2), L, 2^L);
 end
 
-lgraph = layerGraph();
-lgraph = addLayers(lgraph, imageInputLayer(inputSize, ...
-    'Name', 'input', 'Normalization', options.Normalization));
-
 % node_out{i+1, j+1} holds the name of the layer producing X(i,j)
 node_out = cell(L + 1, L + 1);
 node_names = strings(0, 1);
 
-% ─── Encoder: the j = 0 column ───────────────────────────────────────────
-src = 'input';
-for i = 0:L
-    name = sprintf('x%d_%d', i, 0);
+use_resnet = strcmpi(options.Encoder, 'resnet18');
 
-    if i > 0
-        pool = sprintf('pool%d', i);
-        lgraph = addLayers(lgraph, maxPooling2dLayer(2, 'Stride', 2, 'Name', pool));
-        lgraph = connectLayers(lgraph, src, pool);
-        src = pool;
+if use_resnet
+    % ResNet-18's stem is stride 2, so its finest feature map is half the input
+    % resolution. The decoder therefore tops out at half size and a final
+    % upsample restores the input resolution before classification.
+    if L ~= 4
+        error('NETRA:ResnetDepth', ...
+            'The resnet18 encoder provides 5 stages, so Depth must be 4, not %d.', L);
     end
+    [lgraph, node_out, node_names, filters] = resnet18_encoder(inputSize);
+else
+    lgraph = layerGraph();
+    lgraph = addLayers(lgraph, imageInputLayer(inputSize, ...
+        'Name', 'input', 'Normalization', options.Normalization));
 
-    [lgraph, out] = add_conv_block(lgraph, name, filters(i + 1), options.Dropout);
-    lgraph = connectLayers(lgraph, src, [name '_conv1']);
+    % ─── Encoder: the j = 0 column ───────────────────────────────────────
+    src = 'input';
+    for i = 0:L
+        name = sprintf('x%d_%d', i, 0);
 
-    node_out{i + 1, 1} = out;
-    node_names(end + 1) = string(name); %#ok<AGROW>
-    src = out;
+        if i > 0
+            pool = sprintf('pool%d', i);
+            lgraph = addLayers(lgraph, maxPooling2dLayer(2, 'Stride', 2, 'Name', pool));
+            lgraph = connectLayers(lgraph, src, pool);
+            src = pool;
+        end
+
+        [lgraph, out] = add_conv_block(lgraph, name, filters(i + 1), options.Dropout);
+        lgraph = connectLayers(lgraph, src, [name '_conv1']);
+
+        node_out{i + 1, 1} = out;
+        node_names(end + 1) = string(name); %#ok<AGROW>
+        src = out;
+    end
 end
 
 % ─── Nested skip lattice ─────────────────────────────────────────────────
@@ -159,10 +196,24 @@ head_names = strings(0, 1);
 for j = head_js
     src_node = node_out{1, j + 1};
     head = sprintf('head_%d', j);
-    lgraph = addLayers(lgraph, [ ...
-        convolution2dLayer(1, numClasses, 'Name', [head '_conv'], 'Padding', 'same')
-        softmaxLayer('Name', head)]);
-    lgraph = connectLayers(lgraph, src_node, [head '_conv']);
+
+    if use_resnet
+        % Restore full input resolution, which the stride-2 stem halved.
+        lgraph = addLayers(lgraph, [ ...
+            transposedConv2dLayer(2, filters(1), 'Stride', 2, 'Name', [head '_up'])
+            convolution2dLayer(3, filters(1), 'Padding', 'same', 'Name', [head '_conv0'])
+            batchNormalizationLayer('Name', [head '_bn'])
+            reluLayer('Name', [head '_relu'])
+            convolution2dLayer(1, numClasses, 'Name', [head '_conv'], 'Padding', 'same')
+            softmaxLayer('Name', head)]);
+        lgraph = connectLayers(lgraph, src_node, [head '_up']);
+    else
+        lgraph = addLayers(lgraph, [ ...
+            convolution2dLayer(1, numClasses, 'Name', [head '_conv'], 'Padding', 'same')
+            softmaxLayer('Name', head)]);
+        lgraph = connectLayers(lgraph, src_node, [head '_conv']);
+    end
+
     head_names(end + 1) = string(head); %#ok<AGROW>
 end
 
@@ -184,6 +235,7 @@ if nargout > 1
     info.depth          = L;
     info.input_size     = inputSize;
     info.num_classes    = numClasses;
+    info.encoder        = options.Encoder;
 end
 end
 
@@ -206,4 +258,48 @@ if dropout > 0
 end
 
 lgraph = addLayers(lgraph, layers);
+end
+
+
+function [lgraph, node_out, node_names, filters] = resnet18_encoder(inputSize)
+% RESNET18_ENCODER  Pretrained ResNet-18 as the UNet++ j = 0 column
+%   Returns the encoder as a layerGraph together with the layer names producing
+%   X(i,0), and the channel width at each level.
+%
+%   The pretrained network expects 224x224 and ends in a classifier. Both are
+%   replaced: the input layer is resized, and the global pool and fully
+%   connected head are removed, leaving a fully convolutional feature extractor.
+%   Every convolution keeps its ImageNet weights.
+
+try
+    net = imagePretrainedNetwork("resnet18");
+catch e
+    error('NETRA:ResnetUnavailable', ...
+        ['ResNet-18 is not available: %s\n' ...
+         'Install the Deep Learning Toolbox Model for ResNet-18 Network ' ...
+         'support package, or use Encoder ''scratch''.'], e.message);
+end
+
+lgraph = layerGraph(net);
+
+% Accept the project's canvas rather than ImageNet's 224. Normalization is off
+% because enhance_fundus already returns [0,1].
+input_name = net.Layers(1).Name;
+lgraph = replaceLayer(lgraph, input_name, ...
+    imageInputLayer(inputSize, 'Name', 'input', 'Normalization', 'none'));
+
+% Drop the classification head; only the feature hierarchy is wanted.
+lgraph = removeLayers(lgraph, {'pool5', 'fc1000', 'prob'});
+
+% The five stages, finest first. conv1_relu is at half the input resolution
+% because the ResNet stem uses stride 2, so the decoder's final head upsamples.
+taps = {'conv1_relu', 'res2b_relu', 'res3b_relu', 'res4b_relu', 'res5b_relu'};
+filters = [64, 64, 128, 256, 512];
+
+node_out = cell(5, 5);
+node_names = strings(0, 1);
+for i = 1:5
+    node_out{i, 1} = taps{i};
+    node_names(end + 1) = string(sprintf('x%d_0', i - 1)); %#ok<AGROW>
+end
 end
