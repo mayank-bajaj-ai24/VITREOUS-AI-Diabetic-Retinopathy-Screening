@@ -198,6 +198,33 @@ Supporting files added while building the phase:
 
 #### Measured Results
 
+All figures below are Dice on **378 images held out from every model compared**,
+drawn from IDRiD and DDR. Numbers printed during training use each run's own
+validation split and are not comparable between runs.
+
+| Model | Training data | MA | HE | EX | SE | Mean |
+|---|---|---|---|---|---|---|
+| v1 | IDRiD, 65 images | 0.140 | 0.209 | 0.057 | 0.255 | 0.165 |
+| v2 | IDRiD + DDR, 431 images | 0.314 | **0.000** | 0.429 | 0.436 | **0.295** |
+| v3 | as v2, balanced class weights | 0.308 | 0.169 | 0.352 | 0.310 | 0.285 |
+
+**v3 is the recommended model** despite v2's marginally higher mean. v2 cannot
+report a haemorrhage at all: the class collapsed to zero. Haemorrhage burden is
+part of what separates Moderate from Severe NPDR, so v2 would systematically
+under-grade the patients most in need of referral. A 0.010 difference in mean
+Dice over 378 images is within noise; a dead class is not.
+
+Two findings worth carrying forward:
+
+- **Training data is the lever that works.** 65 to 431 images raised mean Dice
+  from 0.165 to 0.295, a 78% gain. Every loss-weighting change since has moved
+  it by hundredths, and v2 to v3 was a trade rather than a gain.
+- **No model has been trained to convergence.** v2 and v3 both stopped on "max
+  epochs completed" with validation loss still falling. Their reported figures
+  are floors, not ceilings.
+
+#### Superseded Results
+
 Dataset: all 81 IDRiD segmentation images through Phase 1 and Phase 2 to enhanced 512×512, split 65 train / 16 validation by image. **Zero quality-gate rejections** after the `check_fov` fix below.
 
 Model: UNet++ depth 4, 32 base filters equivalent width 16, 2.3M parameters, trained on CPU in 144.6 minutes. Converged on the validation criterion rather than exhausting its epoch budget.
