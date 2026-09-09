@@ -727,3 +727,62 @@ verifyFalse(testCase, fov(10, 10), 'Green-only surround was accepted as retina')
 verifyLessThan(testCase, nnz(fov) / numel(fov), 0.35);
 verifyGreaterThan(testCase, nnz(fov) / numel(fov), 0.10);
 end
+
+function testUnetppResnetEncoderPreservesTheNestedLattice(testCase)
+% Swapping the encoder must not turn UNet++ into something else: the nested
+% skip lattice is what defines the architecture, and only the j = 0 column is
+% substituted.
+if ~resnet18_available()
+    assumeFail(testCase, 'ResNet-18 support package not installed');
+end
+
+[net, info] = unetpp_layers([256 256 3], 5, struct('Encoder', 'resnet18'));
+
+verifyEqual(testCase, info.num_nodes, 15);      % depth 4 lattice, unchanged
+verifyEqual(testCase, info.encoder, 'resnet18');
+verifyEqual(testCase, info.filters, [64 64 128 256 512]);
+
+% Every nested concatenation still receives all shallower nodes plus its upsample
+conns = net.Connections;
+for j = 1:4
+    for i = 0:(4 - j)
+        cat_name = sprintf('x%d_%d_cat', i, j);
+        sources = string(conns.Source(startsWith(conns.Destination, [cat_name '/'])));
+        verifyEqual(testCase, numel(sources), j + 1, ...
+            sprintf('%s should have %d inputs', cat_name, j + 1));
+    end
+end
+end
+
+function testUnetppResnetEncoderRestoresInputResolution(testCase)
+% ResNet's stem is stride 2, so the finest encoder feature is half size. The
+% head must upsample back, or every predicted mask would be half the image.
+if ~resnet18_available()
+    assumeFail(testCase, 'ResNet-18 support package not installed');
+end
+
+net = initialize(unetpp_layers([256 256 3], 5, struct('Encoder', 'resnet18')));
+y = extractdata(predict(net, dlarray(rand(256, 256, 3, 2, 'single'), 'SSCB')));
+
+verifyEqual(testCase, size(y), [256, 256, 5, 2]);
+verifyEqual(testCase, double(sum(y, 3)), ones(256, 256, 1, 2), 'AbsTol', 1e-4);
+end
+
+function testUnetppResnetEncoderRejectsWrongDepth(testCase)
+% ResNet-18 exposes exactly five stages, so any other depth cannot be wired.
+if ~resnet18_available()
+    assumeFail(testCase, 'ResNet-18 support package not installed');
+end
+verifyError(testCase, ...
+    @() unetpp_layers([256 256 3], 5, struct('Encoder', 'resnet18', 'Depth', 3)), ...
+    'NETRA:ResnetDepth');
+end
+
+function tf = resnet18_available()
+tf = true;
+try
+    imagePretrainedNetwork("resnet18");
+catch
+    tf = false;
+end
+end
