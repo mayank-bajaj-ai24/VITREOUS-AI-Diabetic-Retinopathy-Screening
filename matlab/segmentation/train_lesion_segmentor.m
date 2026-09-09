@@ -281,9 +281,19 @@ if ~isfolder(img_dir)
     error('NETRA:SplitMissing', 'No images directory at %s', img_dir);
 end
 
+% macOS tar writes AppleDouble metadata beside every file, named "._<file>".
+% On Linux those are ordinary files with a .png extension, so imageDatastore
+% collects them as images and the tile count silently doubles. Excluding them
+% here is cheaper than discovering it as a manifest mismatch mid-training.
 imds = imageDatastore(img_dir, 'FileExtensions', {'.png'});
+imds = subset(imds, find(~is_sidecar(imds.Files)));
+
 pxds = pixelLabelDatastore(lab_dir, cellstr(classes.names), classes.ids, ...
     'FileExtensions', {'.png'});
+keep = find(~is_sidecar(pxds.Files));
+if numel(keep) ~= numel(pxds.Files)
+    pxds = pixelLabelDatastore(pxds.Files(keep), pxds.ClassNames, classes.ids);
+end
 
 if numel(imds.Files) ~= numel(pxds.Files)
     error('NETRA:PairMismatch', ...
@@ -305,6 +315,18 @@ supds = arrayDatastore(supervision, 'IterationDimension', 1, 'OutputType', 'same
 
 ds = combine(imds, pxds, supds);
 ds = transform(ds, @(data) prepare_pair(data, classes, tile_size, augment));
+end
+
+
+function tf = is_sidecar(files)
+% IS_SIDECAR  Metadata files that are not images
+%   macOS archives carry AppleDouble sidecars named "._<file>", and any
+%   dot-prefixed name is hidden rather than data.
+tf = false(numel(files), 1);
+for i = 1:numel(files)
+    [~, name, ext] = fileparts(files{i});
+    tf(i) = startsWith([name ext], '.');
+end
 end
 
 

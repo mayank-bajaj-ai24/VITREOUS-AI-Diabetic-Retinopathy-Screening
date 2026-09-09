@@ -16,7 +16,17 @@ terminal in June 2025, which is the only reason this works at all.
 On your machine:
 
 ```bash
-tar czf netra-colab.tar.gz matlab configs data/processed/segmentation
+COPYFILE_DISABLE=1 tar czf netra-colab.tar.gz matlab configs data/processed/segmentation
+```
+
+`COPYFILE_DISABLE=1` matters on macOS. Without it tar writes an AppleDouble
+sidecar beside every file, named `._<file>`, which on Linux is an ordinary file
+with a .png extension. imageDatastore then collects those as images and training
+fails on a manifest mismatch. If an archive was made without it, clear them
+after extracting:
+
+```bash
+find /content/netra -name "._*" -delete
 ```
 
 Upload that file to Google Drive. Roughly 240 MB. Doing this once means later
