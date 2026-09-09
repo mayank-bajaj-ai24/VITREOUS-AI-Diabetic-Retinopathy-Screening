@@ -63,6 +63,21 @@ paste it in. A MATLAB prompt means it worked; type `exit` to leave.
 Install bare MATLAB first and license it before adding toolboxes. If licensing
 fails there is no point spending twenty minutes installing the rest.
 
+If the ServiceHost fails on a missing shared library such as
+`libXcomposite.so.1`, install the desktop libraries it expects and retry. Colab's
+container omits them, and online licensing launches a GUI-capable component even
+in a headless session:
+
+```bash
+apt-get update
+apt-get install -y libxcomposite1 libxcursor1 libxdamage1 libxfixes3 libxrandr2 libxi6 libxtst6 libxrender1 libxext6 libx11-6 libxft2 libxinerama1 libgtk-3-0 libasound2 libnss3 libcups2 libdrm2 libgbm1 libpango-1.0-0 libcairo2
+```
+
+**`-licmode onlinelicensing` is required on every invocation**, not only the
+first. Without it MATLAB looks for a licence file, finds none, and reports
+"Unable to find a license for MATLAB" even though the interactive login
+succeeded. Every command below carries the flag for that reason.
+
 ## Step 5: add the toolboxes
 
 Still in the terminal, on one line each:
@@ -77,7 +92,7 @@ The second is only needed for the pretrained encoder.
 ## Step 6: confirm MATLAB can see the GPU
 
 ```bash
-/opt/matlab/bin/matlab -batch "gpuDevice"
+/opt/matlab/bin/matlab -licmode onlinelicensing -batch "gpuDevice"
 ```
 
 It must name a Tesla T4. A GPU that is not detected means training silently
@@ -114,7 +129,7 @@ end
 Then run it from the terminal:
 
 ```bash
-/opt/matlab/bin/matlab -batch "run('/content/run.m')"
+/opt/matlab/bin/matlab -licmode onlinelicensing -batch "run('/content/run.m')"
 ```
 
 `Plots` must be `none`: there is no display.
