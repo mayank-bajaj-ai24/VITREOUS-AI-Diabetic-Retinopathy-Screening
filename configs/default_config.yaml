@@ -19,8 +19,23 @@ quality_gate:
     histogram_uniformity_min: 0.3     # Minimum histogram spread
 
   fov:
-    coverage_min: 0.70                # 70% FOV coverage required
+    surround_threshold: 10            # Grayscale level separating black surround from retina
+    coverage_min: 0.35                # Loose sanity floor, NOT a quality bar
     centering_max_offset: 0.15        # Max centroid offset from center (fraction of image)
+    # Coverage is the fraction of the rectangular frame filled by the circular
+    # retina, so it measures the camera's framing convention rather than image
+    # quality. Measured aperture coverage by source:
+    #     DDR    0.433 - 0.719
+    #     IDRiD  0.690 - 0.796
+    #     APTOS  0.745 - 0.833
+    # At 0.70 it rejected 79 of 81 IDRiD images; at 0.60 it rejected 71% of DDR.
+    # Chasing it per dataset treats the symptom. The check that actually detects
+    # a cut-off fundus is centering: a deliberately cut-off capture measures
+    # offset 0.617 against 0.000-0.062 for every legitimate image across all
+    # three sources, so the 0.15 threshold separates them by a factor of four
+    # and does so independently of the camera.
+    # coverage_min is therefore a floor that catches gross failures only. The
+    # cut-off capture measures 0.172, well clear of DDR's 0.433 minimum.
 
 # ─── Enhancement Parameters (Phase 2) ───
 enhancement:
@@ -58,12 +73,54 @@ enhancement:
     medium_threshold: 0.7             # Below this → medium enhancement
     # Above medium_threshold → low enhancement
 
+# ─── Segmentation (Phase 3) ───
+# Per the master implementation plan section 3, every dataset flows:
+#   Raw -> Phase 1 Quality Gate -> Phase 2 Enhancement -> Enhanced 512x512
+# and that enhanced 512x512 set is what trains UNet++. The segmentation track
+# therefore uses the same canvas as the grading track, so one enhanced dataset
+# serves both Phase 3 and Phase 4.
+#
+# tile_size equal to input_size means one sample per image and no tiling; the
+# tiling machinery stays in place so a larger canvas can be introduced later
+# without changing the pipeline.
+segmentation:
+  input_size: 512                     # Enhanced canvas, per plan section 3
+  tile_size: 512                      # Equal to input_size => no tiling
+  tile_overlap: 128                   # Only applies if input_size > tile_size
+  num_classes: 5                      # background + MA + HE + EX + SE
+
+  # Vessel extraction. Calibres are fractions of field-of-view diameter, not
+  # pixels, so the same values hold at 512 and at 1024.
+  vessels:
+    calibre_min_pct: 0.0025           # Fine arterioles
+    calibre_max_pct: 0.0140           # Major arcade veins
+    num_scales: 6                     # Frangi scales across that range
+    structure_sensitivity: 0.25       # Fraction of max response
+    seed_percentile: 98.5             # Hysteresis: confident vessel seeds
+    grow_percentile: 92.0             # Hysteresis: weak continuation
+    min_object_area_pct: 2.0e-5       # Speckle removal, fraction of canvas
+    fov_erode_pct: 0.015              # Keeps Frangi off the aperture rim
+
+  # Optic disc and fovea localisation.
+  optic_disc:
+    radius_min_pct: 0.050             # Disc radius as fraction of FOV diameter
+    radius_max_pct: 0.120
+    disc_diameter_pct: 0.143          # Typical disc diameter (~1/7 of fundus)
+    hough_sensitivity: 0.95
+    refine_percentile: 90             # Boundary threshold within local ROI
+    exclusion_margin: 1.30            # Exudate false-positive exclusion zone
+    fovea_distance_dd: 2.5            # Fovea offset in disc diameters
+    fovea_band_dd: 1.0                # Tolerance on that distance
+    vessel_weight: 0.35               # Weight of vessel convergence cue
+    fovea_vessel_weight: 0.45         # Weight of the avascular-zone cue
+    fovea_prior_weight: 0.25          # Weight of the distance prior
+
 # ─── Model Architecture (Phase 3) ───
 models:
   segmentation:
-    backbone: "resnet34"              # UNet++ encoder backbone
-    num_classes: 3                    # Microaneurysms, Hemorrhages, Exudates
-    input_size: 512
+    backbone: "unetpp"                # Nested UNet++ built via layerGraph
+    num_classes: 5                    # background + MA + HE + EX + SE
+    input_size: 512                   # Tile size; canvas is segmentation.input_size
 
   grading:
     efficientnet_features: 1792       # EfficientNet-B4 output dim
