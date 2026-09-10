@@ -135,8 +135,8 @@ draw_live(fig, panels, titles);
 % ═══ STAGE 3: segmentation ═══════════════════════════════════════════════
 fprintf('STAGE 3  Structure & Lesion Segmentation (Phase 3)\n');
 
-model_path = fullfile(proj_root, 'data', 'processed', 'segmentation', 'unetpp_lesion.mat');
-has_model = isfile(model_path);
+model_path = netra_model_path();
+has_model = ~isempty(model_path);
 
 valid = canvas_valid_mask(geom);
 vessels = segment_vessels(canvas, cfg, valid);
@@ -195,7 +195,7 @@ draw_live(fig, panels, titles);
             fullfile(out_dir, 'clinical_overlay_keyed.png'));
 draw_live(fig, panels, titles);
 else
-    fprintf('  3d lesions   no trained model at %s\n', model_path);
+    fprintf('  3d lesions   no trained model found\n');
     fprintf('               run run_training first\n');
 end
 
