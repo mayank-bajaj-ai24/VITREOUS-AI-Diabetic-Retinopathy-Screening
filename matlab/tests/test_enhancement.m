@@ -35,5 +35,13 @@ img = uint8(ones(100, 100, 3) * 100);
 img(40:60, 40:60, 2) = 150; % Vessel-like patch in green channel
 enh = apply_clahe(img, 2.0, 8, 'green');
 verifyEqual(testCase, size(enh), size(img));
-verifyTrue(testCase, max(enh(:,:,2)) > max(img(:,:,2)));
+
+% max() over a 2-D matrix reduces one dimension and returns a row vector, which
+% verifyTrue rejects: it requires a scalar. Reduce over all elements.
+verifyGreaterThan(testCase, max(enh(:, :, 2), [], 'all'), ...
+                            max(img(:, :, 2), [], 'all'));
+
+% CLAHE targets the green channel; red and blue must be untouched
+verifyEqual(testCase, enh(:, :, 1), img(:, :, 1));
+verifyEqual(testCase, enh(:, :, 3), img(:, :, 3));
 end

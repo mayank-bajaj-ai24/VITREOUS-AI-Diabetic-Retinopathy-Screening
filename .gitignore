@@ -216,3 +216,27 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# NETRA: generated demo output
+data/sample_images/segmentation_output/
+
+# NETRA: datasets are large and externally sourced - never commit them
+data/datasets/
+
+# NETRA: prepared training tiles are regenerable from data/datasets.
+# Contents are excluded rather than the directory itself, because git cannot
+# re-include a file whose parent directory is excluded, and the recommended
+# model below has to survive that rule.
+data/processed/*
+!data/processed/models/
+data/processed/models/*
+# The recommended model ships with the repository so a fresh clone can run the
+# demos without training anything or downloading a 900 MB dataset first.
+!data/processed/models/v4_resnet18.mat
+!data/processed/models/v4_resnet18_manifest.mat
+
+# NETRA: generated walkthrough output
+data/sample_images/walkthrough/
+
+# NETRA: model snapshots and comparison output
+data/sample_images/comparison/

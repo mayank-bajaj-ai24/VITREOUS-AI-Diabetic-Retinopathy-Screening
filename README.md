@@ -50,36 +50,69 @@ NETRA/
 │   ├── config/           # YAML config loader (load_config.m) [DONE ✅]
 │   ├── quality/          # Phase 1: Quality Gate Module [DONE ✅]
 │   ├── enhancement/      # Phase 2: Quality-Adaptive Enhancement [DONE ✅]
-│   ├── segmentation/     # Phase 3: Structure & Lesion Segmentation [NEXT ⏳]
-│   ├── classification/   # Phase 4: DR Severity Grading Hybrid Model
-│   ├── explainability/   # Phase 5: Grad-CAM XAI & Calibration
-│   ├── simulink/         # Phase 5: SimEvents Operational Model
-│   ├── app/              # Phase 5: MATLAB App Designer GUI
-│   ├── demo/             # Master Pipeline Demo (run_pipeline_demo.m) [DONE ✅]
+│   ├── segmentation/     # Phase 3: Structure & Lesion Segmentation [DONE ✅]
+│   ├── classification/   # Phase 4: DR Severity Grading Hybrid Model [PLANNED ⏳]
+│   ├── explainability/   # Phase 5: Grad-CAM XAI & Calibration [PLANNED ⏳]
+│   ├── simulink/         # Phase 5: SimEvents Operational Model [PLANNED ⏳]
+│   ├── app/              # Phase 5: MATLAB App Designer GUI [PLANNED ⏳]
+│   ├── demo/             # Pipeline demos [DONE ✅]
 │   └── tests/            # MATLAB Unit Test Suites [DONE ✅]
 ├── configs/              # Project YAML configurations
-├── data/                 # Sample images & datasets
-└── python_legacy/        # Archived Python legacy code
+└── data/                 # Sample images & datasets
+
+Directories marked PLANNED do not exist yet.
 ```
 
 ## Quick Start (MATLAB R2026a)
 
-1. Open **MATLAB R2026a**.
-2. Navigate to the project root directory:
-   ```matlab
-   cd('C:\Users\mayan\OneDrive\Desktop\SIH 2.0\NETRA-National-Eye-Triage-Retinal-Assessment')
-   ```
-3. Run the **Master Phase 1 & Phase 2 Pipeline Demo**:
+1. Open **MATLAB R2026a** and navigate to the project root.
+
+2. **Phase 1 & 2 — quality gate and enhancement:**
    ```matlab
    cd matlab/demo
    run_pipeline_demo
    ```
-4. Run automated MATLAB unit tests:
+
+3. **Phase 3 — structures and lesions:**
+   ```matlab
+   run_segmentation_demo
+   ```
+   Shows vessels, optic disc and fovea. If a trained model is present it also
+   segments lesions; otherwise it says so.
+
+4. **Train the Phase 3 lesion model.** Download the IDRiD `A. Segmentation`
+   subset and extract it to `data/datasets/idrid/`, then:
+   ```matlab
+   run_training
+   ```
+   Prepares the dataset (~10 min) and trains. On an Apple M1 Pro, CPU only,
+   about 2.5 hours at the default width. MATLAB accelerates only through NVIDIA
+   CUDA, so Apple Silicon GPUs are not used.
+
+5. **Run the unit tests:**
    ```matlab
    cd ../tests
    runtests('test_quality_gate')
    runtests('test_enhancement')
+   runtests('test_segmentation')
    ```
+
+## Phase 3 Results
+
+All 81 IDRiD segmentation images through Phase 1 → Phase 2 → enhanced 512×512,
+split 65 train / 16 validation by image, zero quality-gate rejections.
+Nested UNet++ (depth 4, 2.3M parameters) trained on CPU in 145 minutes.
+
+| Lesion class | Dice | Precision | Recall |
+|---|---|---|---|
+| Microaneurysms | 0.4742 | 0.468 | 0.481 |
+| Haemorrhages | 0.4724 | 0.597 | 0.391 |
+| Hard exudates | 0.5961 | 0.630 | 0.566 |
+| Soft exudates | 0.6799 | 0.594 | 0.794 |
+
+Measured on 16 validation images, so these figures carry wide error bars. The
+binding constraint is training data volume: IDRiD provides 81 annotated images
+and no healthy retinas. See the implementation plan for known limitations.
 
 ## Target Metrics
 

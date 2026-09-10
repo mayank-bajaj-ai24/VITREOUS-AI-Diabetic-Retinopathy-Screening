@@ -3,6 +3,12 @@
 %   This script processes all sample fundus images in data/sample_images/,
 %   evaluates quality gate metrics, applies adaptive enhancement, and prints
 %   a comparison report.
+%
+%   This covers Phase 1 and Phase 2 only. For the full pipeline through Phase 3
+%   segmentation:
+%     run_segmentation_demo  - Phases 1-3 on every sample, with lesion overlays
+%     run_walkthrough        - one image, every stage rendered as a labelled panel
+%     run_training           - trains the Phase 3 lesion model
 
 clear; clc;
 

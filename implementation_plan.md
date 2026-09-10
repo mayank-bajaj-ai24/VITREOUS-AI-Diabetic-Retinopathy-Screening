@@ -157,19 +157,20 @@ Raw Fundus Image (APTOS / IDRiD)
 
 ---
 
-### Phase 3 — Retinal Structure & Lesion Segmentation (MATLAB) — [NEXT STEP FOR TEAM ⏳]
+### Phase 3 — Retinal Structure & Lesion Segmentation (MATLAB) — [COMPLETED ✅]
 
 **Purpose:** Extract key anatomical structures and segment clinical DR lesions in MATLAB using Image Processing & Deep Learning Toolboxes.
 
 #### How UNet++ is Handled in MATLAB
 > [!NOTE]
-> **Implementation Options for Teammates:**
-> 1. **Native MATLAB U-Net (`unetLayers`)**: Use MATLAB Deep Learning Toolbox's built-in `unetLayers([512 512 3], 4)` for semantic segmentation.
-> 2. **Custom UNet++ DAG Network**: Construct nested skip-connections using MATLAB `layerGraph()` and Deep Network Designer.
-> 3. **ONNX Import (`importONNXNetwork`)**: Export a trained PyTorch UNet++ model to ONNX (`unetplusplus.onnx`) and load directly into MATLAB using:
->    ```matlab
->    net = importONNXNetwork('unetplusplus.onnx', 'OutputLayerType', 'classification');
->    ```
+> **Option 2 was implemented.** A true nested UNet++ DAG is generated programmatically in `unetpp_layers.m`:
+> `X(i,j) = conv([X(i,0) ... X(i,j-1), up(X(i+1,j-1))])`, giving 15 nodes at depth 4.
+>
+> The other two options were ruled out on inspection:
+> - **`unetLayers`** builds a plain U-Net with one skip per resolution. Calling that UNet++ in the report would not be true.
+> - **`importONNXNetwork`** requires the Deep Learning Toolbox Converter for ONNX add-on, which is **not installed** on the project's MATLAB R2026a (`exist('importONNXNetwork')` returns 0). The PyTorch export route is unavailable.
+>
+> Other R2026a API corrections found while building this phase: `trainNetwork` is legacy and cannot take a custom loss, so `trainnet` is used; `gradcam` is actually `gradCAM`; `efficientnetb4` does not exist and is reached through `imagePretrainedNetwork` (relevant to Phase 4).
 
 #### Components
 - **Optic Disc & Fovea Localization (`locate_optic_disc.m`)** — Circular Hough Transform + intensity peak detection to locate optic disc and calculate foveal coordinates.
@@ -179,13 +180,92 @@ Raw Fundus Image (APTOS / IDRiD)
   - Hemorrhages (blot/flame bleeding)
   - Hard & Soft Exudates (yellow lipid deposits)
 
-#### Proposed MATLAB Files
-- `matlab/segmentation/locate_optic_disc.m` — Circular Hough Transform & intensity centroid localization.
-- `matlab/segmentation/segment_vessels.m` — Frangi filter / matched filter vessel extraction.
-- `matlab/segmentation/unetpp_layers.m` — Builds UNet++ network architecture using MATLAB `unetLayers()` / custom DAG network.
-- `matlab/segmentation/train_lesion_segmentor.m` — Script to train UNet++ on enhanced IDRiD/FGADR dataset using `trainNetwork()`.
-- `matlab/segmentation/segment_lesions.m` — Inference function returning multi-class lesion binary masks.
-- `matlab/tests/test_segmentation.m` — Unit test suite for segmentation routines.
+#### MATLAB Files
+- `matlab/segmentation/locate_optic_disc.m` — Circular Hough + intensity, with vessel convergence folded into the candidate map. [COMPLETED ✅]
+- `matlab/segmentation/segment_vessels.m` — Multiscale Frangi (`fibermetric`) with hysteresis thresholding. [COMPLETED ✅]
+- `matlab/segmentation/unetpp_layers.m` — Nested UNet++ DAG as a `dlnetwork`. [COMPLETED ✅]
+- `matlab/segmentation/train_lesion_segmentor.m` — Trains via `trainnet` with a custom loss. [COMPLETED ✅]
+- `matlab/segmentation/segment_lesions.m` — Inference returning multi-class lesion masks. [COMPLETED ✅]
+- `matlab/tests/test_segmentation.m` — 38 unit tests. [COMPLETED ✅]
+
+Supporting files added while building the phase:
+- `matlab/segmentation/prepare_lesion_dataset.m` — Applies the section 3 data flow rule to IDRiD: Phase 1 gate, Phase 2 enhancement, and the identical crop-and-letterbox geometry replayed onto every lesion mask.
+- `matlab/segmentation/fundus_geometry.m`, `apply_geometry.m`, `invert_geometry.m`, `canvas_valid_mask.m` — The Phase 2 to Phase 3 geometry contract. Verified bit-identical to the Phase 2 output path.
+- `matlab/segmentation/lesion_loss.m` — Focal cross-entropy plus generalised Dice, masked per pixel and per class.
+- `matlab/segmentation/lesion_classes.m` — Single source of truth for the 5-class scheme.
+- `matlab/segmentation/estimate_fov_mask.m`, `tile_image.m`, `stitch_tiles.m`
+- `matlab/demo/run_training.m`, `matlab/demo/run_segmentation_demo.m`
+
+#### Measured Results
+
+All figures below are Dice on **378 images held out from every model compared**,
+drawn from IDRiD and DDR. Numbers printed during training use each run's own
+validation split and are not comparable between runs.
+
+| Model | Training data and change | MA | HE | EX | SE | Mean |
+|---|---|---|---|---|---|---|
+| v1 | IDRiD, 65 images, scratch encoder | 0.140 | 0.209 | 0.057 | 0.255 | 0.165 |
+| v2 | + DDR, 431 images, official splits | 0.314 | 0.000 | 0.429 | 0.436 | 0.295 |
+| v3 | + balanced class weights | 0.308 | 0.169 | 0.352 | 0.310 | 0.285 |
+| **v4** | **+ pretrained ResNet-18 encoder, 60 epochs** | **0.332** | **0.408** | **0.472** | **0.454** | **0.412** |
+
+**v4 is the recommended model**, best on every class. Precision improved
+throughout (microaneurysm 0.26 to 0.31, haemorrhage 0.43 to 0.52, soft exudate
+0.30 to 0.53) while haemorrhage recall roughly tripled, so the gain is broad
+rather than a trade between metrics. It is also one of only two runs to stop on
+the validation criterion rather than exhausting its epoch budget.
+
+Its remaining weakness is recall: soft exudate fell from v1's 0.551 to 0.398 and
+microaneurysm sits at 0.316. For screening, a miss costs more than a false
+alarm, so trading some of v4's improved precision back for recall is the
+clearest remaining tuning target.
+
+Two findings worth carrying forward:
+
+- **Data and transfer learning are the levers that work.** Adding DDR took mean
+  Dice from 0.165 to 0.295; the pretrained encoder took it from 0.285 to 0.412.
+  Three runs spent on loss weighting moved it by hundredths, and one of those
+  was a trade rather than a gain.
+- **The plan asked for a ResNet encoder from the start.**
+  `models.segmentation.backbone` was `"resnet34"`, and building the encoder from
+  scratch was an unflagged deviation that cost three runs to discover. MATLAB
+  ships no ResNet-34, so ResNet-18 stands in.
+- **Validation loss is a poor guide to per-class quality here.** The generalised
+  Dice term weights by inverse square frequency and is therefore dominated by
+  microaneurysms, the rarest class. v4's loss curve looked no better than v3's
+  while its Dice was 34% higher, because the classes that improved contribute
+  least to the loss.
+- **Training on a GPU changes what is affordable.** The same run is roughly
+  eight hours on the project's CPU and under two on a free Colab T4, which turns
+  one experiment a night into several a day. See docs/colab-training.md.
+
+#### Superseded Results
+
+Dataset: all 81 IDRiD segmentation images through Phase 1 and Phase 2 to enhanced 512×512, split 65 train / 16 validation by image. **Zero quality-gate rejections** after the `check_fov` fix below.
+
+Model: UNet++ depth 4, 32 base filters equivalent width 16, 2.3M parameters, trained on CPU in 144.6 minutes. Converged on the validation criterion rather than exhausting its epoch budget.
+
+| Lesion class | Dice | Precision | Recall |
+|---|---|---|---|
+| Microaneurysms | 0.4742 | 0.468 | 0.481 |
+| Haemorrhages | 0.4724 | 0.597 | 0.391 |
+| Hard exudates | 0.5961 | 0.630 | 0.566 |
+| Soft exudates | 0.6799 | 0.594 | 0.794 |
+
+Optic disc suppression raises hard exudate precision from 0.616 to 0.630 with **no loss of recall** — across all 16 validation images, zero ground-truth exudate pixels fall inside the exclusion zone.
+
+#### Known Limitations
+- **65 training images.** The binding constraint. Section 3 Step C already calls for FGADR; **DDR** (757 pixel-annotated images, free, no access agreement, already in `datasets.ddr`) is the faster route to the same fix.
+- **No healthy retinas.** IDRiD's segmentation subset is by construction 81 diseased eyes, so the model has never seen a normal fundus. This is a specificity risk against the ≥85% target and cannot be fixed by more training.
+- **Haemorrhage recall is 0.391**, so haemorrhage burden is under-reported. Haemorrhages help separate Moderate from Severe NPDR, so this understates severity.
+- **Soft exudate is scored on only 7 of 16 validation images**; that figure has the widest error bars.
+- **41 of 81 IDRiD images have no soft exudate mask** and one has no haemorrhage mask. These are recorded per image and masked out of the loss, but the affected pixels remain labelled background, so a residual bias against soft exudates persists.
+
+#### Phase 1 and Phase 2 Issues Found
+- **`check_fov` rejected 79 of 81 IDRiD images.** Otsu split the retina's own intensity range rather than retina against surround (on IDRiD_04, coverage measured 0.526 against a true aperture of 0.795), and the 0.70 coverage floor sat just above IDRiD's entire distribution. Fixed: fixed low threshold, floor lowered to 0.60. Verified no verdict change on any pre-existing image.
+- **`apply_clahe` does not mask CLAHE to the field of view**, lifting green in the black surround from 0 to ~19/255. Phase 3 was made robust to it; the root fix belongs in Phase 2 and also affects Phase 4's inputs.
+- **`overexposed_input.png` passes the quality gate** (mean brightness 164–192 against a `brightness_max` of 220). Pre-existing, untouched.
+- **`testExposureCheckNormal` and `testCLAHE` fail on main.** Both are test-code bugs, not source bugs.
 
 ---
 
@@ -225,6 +305,165 @@ Raw Fundus Image (APTOS / IDRiD)
 - `matlab/classification/grade_dr_severity.m` — Takes enhanced image, runs forward pass, returns DR Grade (0–4) and raw probability scores.
 - `matlab/tests/test_classification.m` — Unit test for grading classifier.
 
+#### Datasets Required
+
+| Dataset | Size | Purpose | How to obtain |
+|---|---|---|---|
+| **APTOS 2019** | 3,662 train | Stage 1 pre-training | Kaggle, "APTOS 2019 Blindness Detection" |
+| **IDRiD B. Disease Grading** | 516 (413 / 103) | Stage 2 fine-tuning | Same source as the segmentation archive Phase 3 used: [IEEE DataPort](https://ieee-dataport.org/open-access/indian-diabetic-retinopathy-image-dataset-idrid) or the [Zenodo mirror](https://zenodo.org/records/17219542), file `B. Disease Grading.zip`, 202 MB, no account needed on Zenodo |
+| **DDR grading subset** | 13,676 | Extra training data | Already-used Hugging Face repo, no authentication |
+| Messidor-2 | 1,748 | Optional external validation | messidor.crihan.fr, requires a request |
+
+DDR's grading subset is worth taking: it is free, needs no agreement, and comes
+from the repository Phase 3 already pulled from.
+
+```python
+from huggingface_hub import snapshot_download
+snapshot_download(repo_id="ctmedtech/DDR-dataset", repo_type="dataset",
+                  allow_patterns=["DR_grading/**"], local_dir="data/datasets/ddr")
+```
+
+Note that IDRiD's grading labels cover 516 images while its segmentation subset
+covers 81. They are different subsets of the same archive; do not assume an
+image with a grade also has lesion masks.
+
+#### Before You Start
+
+**Install the pretrained network support packages.** `resnet50` and
+`efficientnetb4` are not present on a clean MATLAB. `imagePretrainedNetwork`
+fails until "Deep Learning Toolbox Model for ResNet-50 Network" is installed
+through Home → Add-Ons → Get Add-Ons. Phase 3 lost time to exactly this.
+
+**Run the quality gate over each dataset and check the rejection rate before
+training.** Phase 1 rejected 79 of 81 IDRiD images and 71% of DDR before Phase 3
+recalibrated it, because the thresholds had been set against three APTOS images.
+A high rejection rate on a new dataset means the thresholds do not suit that
+camera, not that the data is bad.
+
+**Weight classes deliberately and read per-class metrics.** Phase 3 weighted by
+inverse frequency on the assumption that rarer means harder. For haemorrhages
+that is false, and the class collapsed to Dice 0.000 while the mean looked
+healthy. ICDR grades are imbalanced too, and an average will hide a dead class
+completely.
+
+**Arrange GPU access first.** The hybrid model is heavier than Phase 3's
+UNet++, and this project's Mac has no CUDA device so MATLAB trains on CPU.
+`docs/colab-training.md` documents a working free-GPU route, including the two
+blockers that cost an hour to find: missing X11 libraries, and
+`-licmode onlinelicensing` being required on *every* invocation, not just the
+interactive login.
+
+#### How To Execute Phase 4
+
+Work in this order. Each step has something you can check before moving on,
+because the failures in this pipeline are silent ones.
+
+**Step 1 — Install the support packages and confirm they load.**
+
+```matlab
+net = imagePretrainedNetwork("resnet50");        % must not error
+net = imagePretrainedNetwork("efficientnetb0");  % b4 if available
+```
+
+Home → Add-Ons → Get Add-Ons, search "Deep Learning Toolbox Model for ResNet-50
+Network". Do this before writing code; it is a five minute task that otherwise
+blocks you on day one.
+
+**Step 2 — Fetch the datasets and their label files.**
+
+The grading datasets ship labels as CSV, not as folder structure:
+
+- APTOS: `train.csv` with columns `id_code`, `diagnosis` (0-4)
+- IDRiD: `IDRiD_Disease Grading_Training Labels.csv`, with a DR grade and a DME
+  grade per image. Phase 4 grades DR; the DME column is a separate task.
+
+Confirm the label distribution before training. Both datasets are heavily skewed
+toward grade 0, and knowing by how much determines your class weighting.
+
+**Step 3 — Put every image through Phase 1 and Phase 2 first.**
+
+This is the plan's section 3 rule and it is not optional: a model trained on raw
+images and deployed behind the quality gate sees different inputs at inference
+than it saw in training.
+
+Write `matlab/classification/prepare_grading_dataset.m` modelled on
+`prepare_lesion_dataset.m`. It is simpler, because image-level labels need no
+geometric transform, but the same skeleton applies: run `quality_gate`, run
+`enhance_fundus`, write the enhanced 512x512 image, record the label and the
+gate verdict in a manifest.
+
+*Check:* report the quality-gate rejection rate per dataset. If it is high, the
+thresholds do not suit that camera. Phase 3 found the gate rejecting 79 of 81
+IDRiD images for exactly that reason.
+
+**Step 4 — Build the model, and settle an ambiguity in this plan first.**
+
+Section "How ResNet-50 and EfficientNet-B4 are Handled" contains two different
+designs. The prose says to connect both backbones into a single `layerGraph`,
+which is end-to-end training. The code snippet uses `activations()`, which
+extracts features from frozen backbones and trains only the head. These are
+different models with different costs.
+
+Do both, in this order:
+
+- **4a. Frozen features first.** Run both backbones once over the dataset,
+  concatenate to the 3840-d vector, and train only the classifier head. This is
+  fast, runs on CPU, and gives a working baseline within an hour. It also proves
+  the data pipeline before any expensive training.
+- **4b. End-to-end second.** Build the two-branch `dlnetwork` and fine-tune
+  everything. Better results, needs a GPU.
+
+Phase 3 followed the same pattern and it worked: get something end-to-end
+running, then improve it.
+
+*Check:* print the parameter count. If a configuration change does not move it,
+the option was silently ignored — this exact bug cost Phase 3 a training run.
+
+**Step 5 — Two-stage training, per section 3.**
+
+Pre-train on enhanced APTOS, then fine-tune on enhanced IDRiD with a lower
+learning rate. Save the model after *each* stage, not only at the end, so the
+pre-trained weights survive a fine-tuning run that goes wrong.
+
+**Step 6 — Evaluate against the target metrics.**
+
+The targets are QWK ≥ 0.88, referable-DR sensitivity ≥ 90%, specificity ≥ 85%.
+
+MATLAB has no built-in quadratic weighted kappa; write it. For grades 0-4 build
+the 5x5 confusion matrix `O`, the expected matrix `E` from the marginals, and
+the penalty `w(i,j) = (i-j)^2 / 16`, then
+
+```
+QWK = 1 - sum(w .* O) / sum(w .* E)
+```
+
+"Referable DR" means grade ≥ 2, so sensitivity and specificity are computed on
+that binary split, not on the five classes.
+
+*Check:* report the full confusion matrix, not only QWK. A model can reach a
+respectable kappa while never predicting grade 4 at all, and the single number
+hides it. Phase 3 shipped a model that could not predict haemorrhages while its
+mean Dice looked fine.
+
+**Step 7 — Evaluate on data the model never trained on.**
+
+Use IDRiD's published test split. Do not evaluate on a random split of the
+combined data: Phase 3 did that initially, put 20 of IDRiD's 27 official test
+images into training, and produced numbers comparable to nothing.
+
+#### Phase 4 Pitfalls
+
+- **Grade imbalance.** Weight deliberately, and never weight purely by rarity.
+  Phase 3 did that and a class collapsed to zero while the average looked fine.
+- **`activations` is legacy** alongside `dlnetwork`. For a `dlnetwork`, use
+  `predict(net, x, 'Outputs', layerName)`.
+- **EfficientNet-B4 expects 380x380 and ResNet-50 expects 224x224.** Phase 2
+  emits 512x512. Resize per branch, or accept that both are running off-size,
+  but decide knowingly rather than by accident.
+- **APTOS and IDRiD grade differently in practice** even under the same ICDR
+  scale, since they come from different populations and graders. Expect
+  fine-tuning to move the numbers more than you would predict.
+
 ---
 
 ### Phase 5 — Explainability, Calibration & Simulink Operational Model
@@ -244,7 +483,7 @@ Raw Fundus Image (APTOS / IDRiD)
    - Allows users to select an image, view Quality Gate status, enhanced image, lesion overlays, DR grade, and Grad-CAM heatmap in one window.
 
 #### Proposed MATLAB Files
-- `matlab/explainability/generate_gradcam.m` — Computes Grad-CAM heatmap using MATLAB `gradcam()`.
+- `matlab/explainability/generate_gradcam.m` — Computes Grad-CAM heatmap using MATLAB `gradCAM()`.
 - `matlab/explainability/temperature_scaling.m` — Applies temperature scaling to raw softmax probabilities.
 - `matlab/explainability/attention_lesion_iou.m` — Measures IoU alignment between Grad-CAM and lesion masks.
 - `matlab/reporting/generate_pdf_report.m` — Generates a clinical diagnostic report PDF using MATLAB Report Generator / `publish()`.
@@ -252,7 +491,235 @@ Raw Fundus Image (APTOS / IDRiD)
 - `matlab/simulink/run_throughput_analysis.m` — Runs simulation experiments and calculates doctor workload reduction metrics.
 - `matlab/app/NETRA_App.mlapp` — MATLAB App Designer interactive clinical GUI.
 
+#### Datasets Required
+
+| Dataset | Purpose | How to obtain |
+|---|---|---|
+| **None for Grad-CAM** | Attention maps come from Phase 4's model; lesion masks come from Phase 3 | already available |
+| **IDRiD C. Localization** | 516 images with optic disc and fovea centre coordinates | Same archive as before, `C. Localization.zip`, 202 MB |
+| A held-out split of Phase 4's data | Temperature scaling | reuse Phase 4's test split |
+| **None for SimEvents** | Operational simulation needs arrival rates and service times, not images | measured or assumed |
+
+**IDRiD's Localization subset is worth taking even though Phase 5 does not
+strictly need it.** It provides ground-truth optic disc and fovea centres for
+516 images, which is the only way to put a number on `locate_optic_disc`.
+Phase 3 verified that function by eye on a handful of images and can currently
+claim no accuracy figure for it. Measuring it would strengthen both the
+explainability argument and the report.
+
+For SimEvents, one parameter can be measured rather than assumed: Phase 1's
+**quality-gate rejection rate**, which drives the recapture loop. Phase 3
+measured 0 of 81 on IDRiD and 2 of 120 on DDR after recalibration, both on
+curated datasets. A rural PHC with a low-cost camera will be far worse, so treat
+those as a floor and state the assumption explicitly.
+
+#### What Phase 3 Provides
+
+```matlab
+addpath(genpath('matlab'));
+cfg = load_config('configs/default_config.yaml');
+load(netra_model_path(), 'net');
+r = segment_lesions('path/to/fundus.jpg', net, cfg);
+```
+
+`segment_lesions` runs Phase 1 and Phase 2 itself, so a raw image can be passed
+straight in, and it raises rather than guessing if the quality gate rejects it.
+
+| Field | Contents |
+|---|---|
+| `r.masks.<class>` | logical mask per lesion class |
+| `r.label_map` | uint8 canvas: 0 outside the retina, 1 background, 2-5 lesions |
+| `r.stats.<class>` | pixels, connected regions, area fraction of retina |
+| `r.optic_disc` | centre, radius, disc mask, exclusion zone, fovea, confidence |
+| `r.vessels` | mask, vesselness map, density, mean calibre |
+| `r.geom` | geometry for mapping back to original image coordinates |
+
+`lesion_classes()` is the single source of truth for class names, ids and
+colours; read from it rather than hardcoding indices. `overlay_legend` renders
+the colour key, and `run_walkthrough` produces a stage-by-stage contact sheet
+suitable for a report or a live demonstration.
+
+**For attention-lesion IoU:** Grad-CAM output and Phase 3's lesion masks both
+live on the same 512 canvas, so no resampling is needed. Compute IoU there, and
+use `invert_geometry` with `r.geom` only for display on the clinician's original
+image. That round trip is lossy by construction because Phase 2 downsamples.
+
+**For the report:** lesion proximity to the fovea is clinically significant. A
+handful of microaneurysms at the macula threatens sight far more than the same
+lesions in the periphery, and `r.optic_disc` gives both the fovea estimate and
+the disc diameter needed to express distances the way clinicians do.
+
+**Temperature scaling applies to Phase 4's grading softmax, not to Phase 3's
+per-pixel output.** Fit the temperature on a held-out split, never on the set
+used to report calibration error.
+
+#### How To Execute Phase 5
+
+Five deliverables that are largely independent. Do them in this order anyway,
+because each produces something the next one can use.
+
+**Step 1 — Grad-CAM (`generate_gradcam.m`).**
+
+```matlab
+scoreMap = gradCAM(net, img, classIdx, 'ReductionLayer', 'softmax');
+```
+
+The function is `gradCAM`, capital CAM, not `gradcam` as written elsewhere in
+this plan. It needs the name of a convolution layer late in the network; for a
+two-branch model, decide which branch you are explaining, because the answer
+differs between them and a report should say which.
+
+*Check:* the heatmap should concentrate somewhere plausible. If it is uniform,
+the layer choice is wrong.
+
+**Step 2 — Attention-lesion IoU (`attention_lesion_iou.m`).**
+
+This is the argument that the grader looks at real disease rather than an
+artefact, so it is the most valuable single result in Phase 5.
+
+Grad-CAM output and Phase 3's lesion masks are both on the 512 canvas, so no
+resampling is needed:
+
+```matlab
+r = segment_lesions(img, seg_net, cfg);
+lesions = r.label_map > 1;
+attention = imresize(scoreMap, size(lesions));   % Grad-CAM is coarse
+hot = attention > prctile(attention(lesions | true), 90);
+iou = nnz(hot & lesions) / nnz(hot | lesions);
+```
+
+Grad-CAM is far coarser than a lesion mask, so raw IoU will look low. Report
+what fraction of the attention mass falls on lesion pixels alongside it; that is
+the more honest measure of alignment.
+
+*Check:* compare against a shuffled control. If attention scores the same IoU
+against another image's lesion masks, it is not aligned with anything.
+
+**Step 3 — Temperature scaling (`temperature_scaling.m`).**
+
+Applies to Phase 4's grading softmax, not to Phase 3's per-pixel output.
+Optimise a single scalar T on a **held-out** split to minimise NLL, then divide
+the logits by it. Report Expected Calibration Error before and after.
+
+*Check:* T should come out above 1 for an overconfident model. If the fitted T
+is far from 1, or if ECE gets worse, the fit is on the wrong split.
+
+**Step 4 — PDF report (`generate_pdf_report.m`).**
+
+Everything needed already exists. `segment_lesions` returns per-class pixel
+counts, region counts and area fractions; `overlay_legend` renders the colour
+key; `invert_geometry` with `r.geom` maps masks back onto the clinician's
+original image for display.
+
+Include the quality-gate verdict. A report that does not say the image passed
+Phase 1 is asserting a grade without saying it was gradeable.
+
+Lesion distance from the fovea is worth reporting in **disc diameters**, which
+is how clinicians express it. `r.optic_disc` provides both the fovea estimate
+and the disc diameter.
+
+**Step 5 — SimEvents (`clinic_flow_simulation.slx`).**
+
+Needs no imaging data. Model: patient arrives, image captured, quality gate,
+recapture loop on failure, enhancement, AI grading, referral of grade ≥ 2 to a
+tele-ophthalmologist.
+
+Two parameters can be measured rather than assumed:
+
+- **Quality-gate rejection rate**, which drives the recapture loop. Phase 3
+  measured 0 of 81 on IDRiD and 2 of 120 on DDR *after* recalibration, both on
+  curated datasets. A PHC with a low-cost camera will be far worse. State it as
+  an assumption and vary it.
+- **Per-image processing time.** Measure it with `tic`/`toc` on
+  `run_segmentation_demo` rather than guessing.
+
+The workload-reduction target of ≥ 80% follows from the referral rate: if the AI
+refers 20% of patients, the ophthalmologist reviews 20% of the caseload. Say
+that plainly rather than presenting it as an emergent result of the simulation.
+
+**Step 6 — App Designer GUI (`NETRA_App.mlapp`).**
+
+The pipeline is already callable in one line, so the GUI is mostly layout:
+
+```matlab
+r = segment_lesions(imagePath, net, cfg);
+```
+
+Handle the rejection path. `segment_lesions` raises `NETRA:QualityGateFailed` on
+an ungradeable image, and the GUI should show `q.alert.message` and its action
+items rather than an error dialog. That recapture guidance is a genuine feature
+of the system and worth demonstrating.
+
+`run_walkthrough` already renders every stage as a labelled panel and is a
+reasonable model for the display.
+
+#### Phase 5 Pitfalls
+
+- **Grad-CAM resolution.** It is computed at a late convolution layer and is
+  therefore coarse, often 16x16 upsampled to 512. It will never align tightly
+  with a 4-pixel microaneurysm. Say so rather than presenting weak IoU as a
+  failure of the grader.
+- **Do not calibrate on the reporting split.** Fitting T on the same data used
+  to report ECE guarantees a flattering and meaningless number.
+- **The round trip through `invert_geometry` is lossy** because Phase 2
+  downsamples. Overlay on the original for display; compute every metric on the
+  canvas.
+- **SimEvents results are only as good as the arrival and service assumptions.**
+  State them in the report. A throughput figure derived from invented parameters
+  is not evidence, and a judge will ask where the numbers came from.
+
 ---
+
+## 4b. MATLAB R2026a API Corrections
+
+Verified on the project's installation. Four functions named in this plan do not
+behave as written, and pretrained weights are not present by default. Check these
+before designing around them.
+
+| This plan says | Reality on MATLAB R2026a |
+|---|---|
+| `importONNXNetwork` | **Does not exist.** Requires the Deep Learning Toolbox Converter for ONNX Model Format add-on, which is not installed. The PyTorch export route is unavailable. |
+| `efficientnetb4` | **Does not exist.** Reached through `imagePretrainedNetwork("efficientnetb4")`. |
+| `gradcam` | Actually **`gradCAM`**, capital CAM. |
+| `trainNetwork` | Legacy, and **cannot take a custom loss function**. Use `trainnet`. Phase 3 needs a custom loss and uses it. |
+| `unetLayers` | Exists but builds a **plain U-Net**, one skip per resolution. Calling that UNet++ would not be true. Phase 3 builds the nested lattice directly in `unetpp_layers.m`. |
+
+**Pretrained weights are separate support packages and are absent on a clean
+install.** `imagePretrainedNetwork("resnet18")`, `("resnet50")` and the rest all
+fail until the corresponding "Deep Learning Toolbox Model for ..." add-on is
+installed through Home → Add-Ons → Get Add-Ons. Phase 3 lost time to this and
+Phase 4 will hit it immediately.
+
+**There is no CUDA GPU on the project's development machine.** MATLAB
+accelerates only through NVIDIA CUDA, so Apple Silicon GPUs go unused and
+training runs on CPU: roughly eight hours for Phase 3's model against under two
+on a free Colab T4. `docs/colab-training.md` documents a working route.
+
+## 4c. Working Practices
+
+Learned during Phase 3, at the cost of several wasted training runs.
+
+**Evaluate on data no model has trained on.** Judging models by the validation
+split they were trained against reversed the correct conclusion twice, once
+recommending the weakest of three models. `run_model_comparison` enforces this:
+it recovers each model's training set, evaluates only on the intersection of
+their held-out data, and refuses to compare a model whose provenance cannot be
+established.
+
+**Snapshot every model with its manifest.** `train_lesion_segmentor` overwrites
+its output file. Copy each result into `data/processed/models/` as `<name>.mat`
+alongside `<name>_manifest.mat`, or comparing it later becomes impossible.
+
+**Change one variable per run.** Two of Phase 3's experiments were wasted
+because two things moved at once and neither could be attributed.
+
+**Never quote a figure derived from data you generated.** Synthetic fixtures are
+sound for testing behaviour and worthless as evidence. An early Phase 3 class
+distribution was quoted from fabricated masks and was wrong by a factor of ten.
+
+**Read per-class metrics, not averages.** A mean hides a dead class completely:
+one Phase 3 model scored a respectable mean while being structurally incapable
+of reporting a haemorrhage.
 
 ## 5. Complete MATLAB Directory Structure
 
@@ -276,12 +743,22 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 │   │   ├── select_profile.m
 │   │   ├── compute_metrics.m
 │   │   └── enhance_fundus.m
-│   ├── segmentation/                   # Phase 3: Structure & Lesion Segmentation [NEXT ⏳]
+│   ├── segmentation/                   # Phase 3: Structure & Lesion Segmentation [DONE ✅]
 │   │   ├── locate_optic_disc.m
 │   │   ├── segment_vessels.m
 │   │   ├── unetpp_layers.m
 │   │   ├── train_lesion_segmentor.m
-│   │   └── segment_lesions.m
+│   │   ├── segment_lesions.m
+│   │   ├── prepare_lesion_dataset.m
+│   │   ├── lesion_loss.m
+│   │   ├── lesion_classes.m
+│   │   ├── fundus_geometry.m
+│   │   ├── apply_geometry.m
+│   │   ├── invert_geometry.m
+│   │   ├── canvas_valid_mask.m
+│   │   ├── estimate_fov_mask.m
+│   │   ├── tile_image.m
+│   │   └── stitch_tiles.m
 │   ├── classification/                 # Phase 4: DR Severity Grading
 │   │   ├── build_hybrid_model.m
 │   │   ├── train_dr_classifier.m
@@ -301,7 +778,7 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 │   └── tests/
 │       ├── test_quality_gate.m         # Phase 1 tests [DONE ✅]
 │       ├── test_enhancement.m          # Phase 2 tests [DONE ✅]
-│       ├── test_segmentation.m         # Phase 3 tests
+│       ├── test_segmentation.m         # Phase 3 tests [DONE ✅]
 │       └── test_classification.m       # Phase 4 tests
 ├── configs/
 │   └── default_config.yaml             # Shared project config
@@ -318,7 +795,7 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 |---|---|---|---|---|
 | **Phase 1** | Quality Gate | Mayank & Krrish | `quality_gate.m`, `check_focus.m`, `check_exposure.m`, `check_fov.m`, `recapture_alert.m` | **COMPLETED ✅** |
 | **Phase 2** | Preprocessing & Enhancement | Mayank & Krrish | `enhance_fundus.m`, `crop_fundus_roi.m`, `apply_clahe.m`, `apply_nlm_denoising.m`, `standardize_image.m` | **COMPLETED ✅** |
-| **Phase 3** | Lesion & Vessel Segmentation | Next Teammate | `segment_vessels.m`, `locate_optic_disc.m`, `segment_lesions.m` (UNet++ via `unetLayers` / `importONNXNetwork`) | **READY TO START ⏳** |
+| **Phase 3** | Lesion & Vessel Segmentation | Dhruv | `segment_vessels.m`, `locate_optic_disc.m`, `segment_lesions.m`, `unetpp_layers.m`, `train_lesion_segmentor.m` (nested UNet++ DAG) | **COMPLETED ✅** |
 | **Phase 4** | DR Severity Grading | Next Teammate | `build_hybrid_model.m`, `grade_dr_severity.m` (ResNet50 + EfficientNet via `resnet50` / `efficientnetb4`) | **PLANNED ⏳** |
 | **Phase 5** | XAI, GUI & SimEvents | Team | `generate_gradcam.m`, `clinic_flow_simulation.slx`, `NETRA_App.mlapp` | **PLANNED ⏳** |
 
