@@ -40,10 +40,9 @@ if ~exist(output_dir, 'dir')
 end
 
 % ─── Trained model, if one exists ────────────────────────────────────────
-model_path = fullfile(proj_root, 'data', 'processed', 'segmentation', ...
-                      'unetpp_lesion.mat');
+model_path = netra_model_path();
 net = [];
-if isfile(model_path)
+if ~isempty(model_path)
     loaded = load(model_path, 'net');
     net = loaded.net;
     fprintf('Lesion model    : %s\n', model_path);
