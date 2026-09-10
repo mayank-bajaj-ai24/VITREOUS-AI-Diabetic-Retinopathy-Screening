@@ -353,6 +353,117 @@ blockers that cost an hour to find: missing X11 libraries, and
 `-licmode onlinelicensing` being required on *every* invocation, not just the
 interactive login.
 
+#### How To Execute Phase 4
+
+Work in this order. Each step has something you can check before moving on,
+because the failures in this pipeline are silent ones.
+
+**Step 1 — Install the support packages and confirm they load.**
+
+```matlab
+net = imagePretrainedNetwork("resnet50");        % must not error
+net = imagePretrainedNetwork("efficientnetb0");  % b4 if available
+```
+
+Home → Add-Ons → Get Add-Ons, search "Deep Learning Toolbox Model for ResNet-50
+Network". Do this before writing code; it is a five minute task that otherwise
+blocks you on day one.
+
+**Step 2 — Fetch the datasets and their label files.**
+
+The grading datasets ship labels as CSV, not as folder structure:
+
+- APTOS: `train.csv` with columns `id_code`, `diagnosis` (0-4)
+- IDRiD: `IDRiD_Disease Grading_Training Labels.csv`, with a DR grade and a DME
+  grade per image. Phase 4 grades DR; the DME column is a separate task.
+
+Confirm the label distribution before training. Both datasets are heavily skewed
+toward grade 0, and knowing by how much determines your class weighting.
+
+**Step 3 — Put every image through Phase 1 and Phase 2 first.**
+
+This is the plan's section 3 rule and it is not optional: a model trained on raw
+images and deployed behind the quality gate sees different inputs at inference
+than it saw in training.
+
+Write `matlab/classification/prepare_grading_dataset.m` modelled on
+`prepare_lesion_dataset.m`. It is simpler, because image-level labels need no
+geometric transform, but the same skeleton applies: run `quality_gate`, run
+`enhance_fundus`, write the enhanced 512x512 image, record the label and the
+gate verdict in a manifest.
+
+*Check:* report the quality-gate rejection rate per dataset. If it is high, the
+thresholds do not suit that camera. Phase 3 found the gate rejecting 79 of 81
+IDRiD images for exactly that reason.
+
+**Step 4 — Build the model, and settle an ambiguity in this plan first.**
+
+Section "How ResNet-50 and EfficientNet-B4 are Handled" contains two different
+designs. The prose says to connect both backbones into a single `layerGraph`,
+which is end-to-end training. The code snippet uses `activations()`, which
+extracts features from frozen backbones and trains only the head. These are
+different models with different costs.
+
+Do both, in this order:
+
+- **4a. Frozen features first.** Run both backbones once over the dataset,
+  concatenate to the 3840-d vector, and train only the classifier head. This is
+  fast, runs on CPU, and gives a working baseline within an hour. It also proves
+  the data pipeline before any expensive training.
+- **4b. End-to-end second.** Build the two-branch `dlnetwork` and fine-tune
+  everything. Better results, needs a GPU.
+
+Phase 3 followed the same pattern and it worked: get something end-to-end
+running, then improve it.
+
+*Check:* print the parameter count. If a configuration change does not move it,
+the option was silently ignored — this exact bug cost Phase 3 a training run.
+
+**Step 5 — Two-stage training, per section 3.**
+
+Pre-train on enhanced APTOS, then fine-tune on enhanced IDRiD with a lower
+learning rate. Save the model after *each* stage, not only at the end, so the
+pre-trained weights survive a fine-tuning run that goes wrong.
+
+**Step 6 — Evaluate against the target metrics.**
+
+The targets are QWK ≥ 0.88, referable-DR sensitivity ≥ 90%, specificity ≥ 85%.
+
+MATLAB has no built-in quadratic weighted kappa; write it. For grades 0-4 build
+the 5x5 confusion matrix `O`, the expected matrix `E` from the marginals, and
+the penalty `w(i,j) = (i-j)^2 / 16`, then
+
+```
+QWK = 1 - sum(w .* O) / sum(w .* E)
+```
+
+"Referable DR" means grade ≥ 2, so sensitivity and specificity are computed on
+that binary split, not on the five classes.
+
+*Check:* report the full confusion matrix, not only QWK. A model can reach a
+respectable kappa while never predicting grade 4 at all, and the single number
+hides it. Phase 3 shipped a model that could not predict haemorrhages while its
+mean Dice looked fine.
+
+**Step 7 — Evaluate on data the model never trained on.**
+
+Use IDRiD's published test split. Do not evaluate on a random split of the
+combined data: Phase 3 did that initially, put 20 of IDRiD's 27 official test
+images into training, and produced numbers comparable to nothing.
+
+#### Phase 4 Pitfalls
+
+- **Grade imbalance.** Weight deliberately, and never weight purely by rarity.
+  Phase 3 did that and a class collapsed to zero while the average looked fine.
+- **`activations` is legacy** alongside `dlnetwork`. For a `dlnetwork`, use
+  `predict(net, x, 'Outputs', layerName)`.
+- **EfficientNet-B4 expects 380x380 and ResNet-50 expects 224x224.** Phase 2
+  emits 512x512. Resize per branch, or accept that both are running off-size,
+  but decide knowingly rather than by accident.
+- **APTOS and IDRiD grade differently in practice** even under the same ICDR
+  scale, since they come from different populations and graders. Expect
+  fine-tuning to move the numbers more than you would predict.
+
 ---
 
 ### Phase 5 — Explainability, Calibration & Simulink Operational Model
@@ -441,6 +552,121 @@ the disc diameter needed to express distances the way clinicians do.
 **Temperature scaling applies to Phase 4's grading softmax, not to Phase 3's
 per-pixel output.** Fit the temperature on a held-out split, never on the set
 used to report calibration error.
+
+#### How To Execute Phase 5
+
+Five deliverables that are largely independent. Do them in this order anyway,
+because each produces something the next one can use.
+
+**Step 1 — Grad-CAM (`generate_gradcam.m`).**
+
+```matlab
+scoreMap = gradCAM(net, img, classIdx, 'ReductionLayer', 'softmax');
+```
+
+The function is `gradCAM`, capital CAM, not `gradcam` as written elsewhere in
+this plan. It needs the name of a convolution layer late in the network; for a
+two-branch model, decide which branch you are explaining, because the answer
+differs between them and a report should say which.
+
+*Check:* the heatmap should concentrate somewhere plausible. If it is uniform,
+the layer choice is wrong.
+
+**Step 2 — Attention-lesion IoU (`attention_lesion_iou.m`).**
+
+This is the argument that the grader looks at real disease rather than an
+artefact, so it is the most valuable single result in Phase 5.
+
+Grad-CAM output and Phase 3's lesion masks are both on the 512 canvas, so no
+resampling is needed:
+
+```matlab
+r = segment_lesions(img, seg_net, cfg);
+lesions = r.label_map > 1;
+attention = imresize(scoreMap, size(lesions));   % Grad-CAM is coarse
+hot = attention > prctile(attention(lesions | true), 90);
+iou = nnz(hot & lesions) / nnz(hot | lesions);
+```
+
+Grad-CAM is far coarser than a lesion mask, so raw IoU will look low. Report
+what fraction of the attention mass falls on lesion pixels alongside it; that is
+the more honest measure of alignment.
+
+*Check:* compare against a shuffled control. If attention scores the same IoU
+against another image's lesion masks, it is not aligned with anything.
+
+**Step 3 — Temperature scaling (`temperature_scaling.m`).**
+
+Applies to Phase 4's grading softmax, not to Phase 3's per-pixel output.
+Optimise a single scalar T on a **held-out** split to minimise NLL, then divide
+the logits by it. Report Expected Calibration Error before and after.
+
+*Check:* T should come out above 1 for an overconfident model. If the fitted T
+is far from 1, or if ECE gets worse, the fit is on the wrong split.
+
+**Step 4 — PDF report (`generate_pdf_report.m`).**
+
+Everything needed already exists. `segment_lesions` returns per-class pixel
+counts, region counts and area fractions; `overlay_legend` renders the colour
+key; `invert_geometry` with `r.geom` maps masks back onto the clinician's
+original image for display.
+
+Include the quality-gate verdict. A report that does not say the image passed
+Phase 1 is asserting a grade without saying it was gradeable.
+
+Lesion distance from the fovea is worth reporting in **disc diameters**, which
+is how clinicians express it. `r.optic_disc` provides both the fovea estimate
+and the disc diameter.
+
+**Step 5 — SimEvents (`clinic_flow_simulation.slx`).**
+
+Needs no imaging data. Model: patient arrives, image captured, quality gate,
+recapture loop on failure, enhancement, AI grading, referral of grade ≥ 2 to a
+tele-ophthalmologist.
+
+Two parameters can be measured rather than assumed:
+
+- **Quality-gate rejection rate**, which drives the recapture loop. Phase 3
+  measured 0 of 81 on IDRiD and 2 of 120 on DDR *after* recalibration, both on
+  curated datasets. A PHC with a low-cost camera will be far worse. State it as
+  an assumption and vary it.
+- **Per-image processing time.** Measure it with `tic`/`toc` on
+  `run_segmentation_demo` rather than guessing.
+
+The workload-reduction target of ≥ 80% follows from the referral rate: if the AI
+refers 20% of patients, the ophthalmologist reviews 20% of the caseload. Say
+that plainly rather than presenting it as an emergent result of the simulation.
+
+**Step 6 — App Designer GUI (`NETRA_App.mlapp`).**
+
+The pipeline is already callable in one line, so the GUI is mostly layout:
+
+```matlab
+r = segment_lesions(imagePath, net, cfg);
+```
+
+Handle the rejection path. `segment_lesions` raises `NETRA:QualityGateFailed` on
+an ungradeable image, and the GUI should show `q.alert.message` and its action
+items rather than an error dialog. That recapture guidance is a genuine feature
+of the system and worth demonstrating.
+
+`run_walkthrough` already renders every stage as a labelled panel and is a
+reasonable model for the display.
+
+#### Phase 5 Pitfalls
+
+- **Grad-CAM resolution.** It is computed at a late convolution layer and is
+  therefore coarse, often 16x16 upsampled to 512. It will never align tightly
+  with a 4-pixel microaneurysm. Say so rather than presenting weak IoU as a
+  failure of the grader.
+- **Do not calibrate on the reporting split.** Fitting T on the same data used
+  to report ECE guarantees a flattering and meaningless number.
+- **The round trip through `invert_geometry` is lossy** because Phase 2
+  downsamples. Overlay on the original for display; compute every metric on the
+  canvas.
+- **SimEvents results are only as good as the arrival and service assumptions.**
+  State them in the report. A throughput figure derived from invented parameters
+  is not evidence, and a judge will ask where the numbers came from.
 
 ---
 
