@@ -91,6 +91,60 @@ Raw Fundus Image (APTOS / IDRiD)
 
 ## 4. Phase-by-Phase Execution Roadmap
 
+### Read This First — MATLAB R2026a API Corrections
+
+Verified on the project's installation. Four functions named in this plan do not
+behave as written, and pretrained weights are not present by default. Check these
+before designing around them.
+
+| This plan says | Reality on MATLAB R2026a |
+|---|---|
+| `importONNXNetwork` | **Does not exist.** Requires the Deep Learning Toolbox Converter for ONNX Model Format add-on, which is not installed. The PyTorch export route is unavailable. |
+| `efficientnetb4` | **Does not exist.** Reached through `imagePretrainedNetwork("efficientnetb4")`. |
+| `gradcam` | Actually **`gradCAM`**, capital CAM. |
+| `trainNetwork` | Legacy, and **cannot take a custom loss function**. Use `trainnet`. Phase 3 needs a custom loss and uses it. |
+| `unetLayers` | Exists but builds a **plain U-Net**, one skip per resolution. Calling that UNet++ would not be true. Phase 3 builds the nested lattice directly in `unetpp_layers.m`. |
+
+**Pretrained weights are separate support packages and are absent on a clean
+install.** `imagePretrainedNetwork("resnet18")`, `("resnet50")` and the rest all
+fail until the corresponding "Deep Learning Toolbox Model for ..." add-on is
+installed through Home → Add-Ons → Get Add-Ons. Phase 3 lost time to this and
+Phase 4 will hit it immediately.
+
+**There is no CUDA GPU on the project's development machine.** MATLAB
+accelerates only through NVIDIA CUDA, so Apple Silicon GPUs go unused and
+training runs on CPU: roughly eight hours for Phase 3's model against under two
+on a free Colab T4. `docs/colab-training.md` documents a working route.
+
+### Read This First — Working Practices
+
+Learned during Phase 3, at the cost of several wasted training runs.
+
+**Evaluate on data no model has trained on.** Judging models by the validation
+split they were trained against reversed the correct conclusion twice, once
+recommending the weakest of three models. `run_model_comparison` enforces this:
+it recovers each model's training set, evaluates only on the intersection of
+their held-out data, and refuses to compare a model whose provenance cannot be
+established.
+
+**Snapshot every model with its manifest.** `train_lesion_segmentor` overwrites
+its output file. Copy each result into `data/processed/models/` as `<name>.mat`
+alongside `<name>_manifest.mat`, or comparing it later becomes impossible.
+
+**Change one variable per run.** Two of Phase 3's experiments were wasted
+because two things moved at once and neither could be attributed.
+
+**Never quote a figure derived from data you generated.** Synthetic fixtures are
+sound for testing behaviour and worthless as evidence. An early Phase 3 class
+distribution was quoted from fabricated masks and was wrong by a factor of ten.
+
+**Read per-class metrics, not averages.** A mean hides a dead class completely:
+one Phase 3 model scored a respectable mean while being structurally incapable
+of reporting a haemorrhage.
+
+---
+
+
 ### Phase 0 — Scope Lock & MATLAB Infrastructure Setup
 
 **Purpose:** Freeze architecture, configure MATLAB toolboxes, prepare datasets.
@@ -274,17 +328,24 @@ Optic disc suppression raises hard exudate precision from 0.616 to 0.630 with **
 **Purpose:** Classify fundus images into International Clinical DR (ICDR) severity levels (0–4) using a dual-branch hybrid model built with MATLAB Deep Learning Toolbox.
 
 #### How ResNet-50 and EfficientNet-B4 are Handled in MATLAB
-> [!NOTE]
-> **Pre-trained Network Availability in MATLAB R2026a:**
-> 1. **ResNet-50**: Built-in MATLAB function `net = resnet50;` (requires Deep Learning Toolbox Model for ResNet-50 Network support package).
-> 2. **EfficientNet-B4**: Built-in MATLAB function `net = efficientnetb4;` OR import via ONNX using `net = importONNXNetwork('efficientnet_b4.onnx');`.
-> 3. **Dual-Branch Fusion Network**: Connect both backbones into a single `layerGraph` in MATLAB:
->    ```matlab
->    % Extract feature layers
->    eff_feat = activations(eff_net, input_img, 'avg_pool');  % 1792-d
->    res_feat = activations(res_net, input_img, 'avg_pool');  % 2048-d
->    fused_feat = [eff_feat; res_feat];                       % 3840-d
->    ```
+> [!WARNING]
+> **Corrected for MATLAB R2026a.** The original text of this section named
+> `efficientnetb4` and `importONNXNetwork`, neither of which exists on this
+> installation. Verified replacements below.
+>
+> 1. **ResNet-50**: `net = imagePretrainedNetwork("resnet50");`
+>    `resnet50` still works but is legacy. Either way the "Deep Learning Toolbox
+>    Model for ResNet-50 Network" support package must be installed first; it is
+>    **not** present on a clean MATLAB.
+> 2. **EfficientNet**: `net = imagePretrainedNetwork("efficientnetb4");`
+>    There is no `efficientnetb4` function. The ONNX route is also unavailable,
+>    because `importONNXNetwork` needs an add-on that is not installed. Check
+>    which EfficientNet variants your installation actually offers before
+>    committing to B4; fall back to B0 if it is absent.
+> 3. **Dual-Branch Fusion**: the prose and the code below it describe two
+>    different models. See "How To Execute Phase 4", step 4, which resolves this.
+>    For a `dlnetwork`, `activations` is legacy; use
+>    `predict(net, x, 'Outputs', layerName)`.
 
 #### Hybrid Model Classifier Head in MATLAB
 - **Feature Fusion**: Concatenates 1792-d + 2048-d → **3840-d combined feature vector**.
@@ -670,57 +731,6 @@ reasonable model for the display.
 
 ---
 
-## 4b. MATLAB R2026a API Corrections
-
-Verified on the project's installation. Four functions named in this plan do not
-behave as written, and pretrained weights are not present by default. Check these
-before designing around them.
-
-| This plan says | Reality on MATLAB R2026a |
-|---|---|
-| `importONNXNetwork` | **Does not exist.** Requires the Deep Learning Toolbox Converter for ONNX Model Format add-on, which is not installed. The PyTorch export route is unavailable. |
-| `efficientnetb4` | **Does not exist.** Reached through `imagePretrainedNetwork("efficientnetb4")`. |
-| `gradcam` | Actually **`gradCAM`**, capital CAM. |
-| `trainNetwork` | Legacy, and **cannot take a custom loss function**. Use `trainnet`. Phase 3 needs a custom loss and uses it. |
-| `unetLayers` | Exists but builds a **plain U-Net**, one skip per resolution. Calling that UNet++ would not be true. Phase 3 builds the nested lattice directly in `unetpp_layers.m`. |
-
-**Pretrained weights are separate support packages and are absent on a clean
-install.** `imagePretrainedNetwork("resnet18")`, `("resnet50")` and the rest all
-fail until the corresponding "Deep Learning Toolbox Model for ..." add-on is
-installed through Home → Add-Ons → Get Add-Ons. Phase 3 lost time to this and
-Phase 4 will hit it immediately.
-
-**There is no CUDA GPU on the project's development machine.** MATLAB
-accelerates only through NVIDIA CUDA, so Apple Silicon GPUs go unused and
-training runs on CPU: roughly eight hours for Phase 3's model against under two
-on a free Colab T4. `docs/colab-training.md` documents a working route.
-
-## 4c. Working Practices
-
-Learned during Phase 3, at the cost of several wasted training runs.
-
-**Evaluate on data no model has trained on.** Judging models by the validation
-split they were trained against reversed the correct conclusion twice, once
-recommending the weakest of three models. `run_model_comparison` enforces this:
-it recovers each model's training set, evaluates only on the intersection of
-their held-out data, and refuses to compare a model whose provenance cannot be
-established.
-
-**Snapshot every model with its manifest.** `train_lesion_segmentor` overwrites
-its output file. Copy each result into `data/processed/models/` as `<name>.mat`
-alongside `<name>_manifest.mat`, or comparing it later becomes impossible.
-
-**Change one variable per run.** Two of Phase 3's experiments were wasted
-because two things moved at once and neither could be attributed.
-
-**Never quote a figure derived from data you generated.** Synthetic fixtures are
-sound for testing behaviour and worthless as evidence. An early Phase 3 class
-distribution was quoted from fabricated masks and was wrong by a factor of ten.
-
-**Read per-class metrics, not averages.** A mean hides a dead class completely:
-one Phase 3 model scored a respectable mean while being structurally incapable
-of reporting a haemorrhage.
-
 ## 5. Complete MATLAB Directory Structure
 
 ```
@@ -813,7 +823,25 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 
 ---
 
-## 8. How to Execute Completed Work (Phases 1 & 2) in MATLAB
+## 8. How to Execute Completed Work (Phases 1-3) in MATLAB
+
+Phase 3's recommended model ships with the repository, so a fresh clone runs the
+full pipeline with no dataset download and no training:
+
+```matlab
+cd matlab/demo
+run_walkthrough          % one image, every stage as a labelled panel
+run_segmentation_demo    % all sample images, with lesion overlays
+```
+
+To retrain, place IDRiD and/or DDR under `data/datasets/` and run
+`run_training`; see `docs/colab-training.md` for the free-GPU route, which turns
+an eight hour run into under two.
+
+To compare models, snapshot each into `data/processed/models/` as `<name>.mat`
+with its `<name>_manifest.mat`, then run `run_model_comparison`.
+
+### Phases 1 and 2 only
 
 1. Launch MATLAB R2026a.
 2. Navigate to project root: `cd NETRA-National-Eye-Triage-Retinal-Assessment`.
