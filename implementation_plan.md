@@ -544,13 +544,25 @@ images into training, and produced numbers comparable to nothing.
    - Allows users to select an image, view Quality Gate status, enhanced image, lesion overlays, DR grade, and Grad-CAM heatmap in one window.
 
 #### Proposed MATLAB Files
-- `matlab/explainability/generate_gradcam.m` — Computes Grad-CAM heatmap using MATLAB `gradCAM()`.
-- `matlab/explainability/temperature_scaling.m` — Applies temperature scaling to raw softmax probabilities.
-- `matlab/explainability/attention_lesion_iou.m` — Measures IoU alignment between Grad-CAM and lesion masks.
-- `matlab/reporting/generate_pdf_report.m` — Generates a clinical diagnostic report PDF using MATLAB Report Generator / `publish()`.
-- `matlab/simulink/clinic_flow_simulation.slx` — SimEvents discrete-event clinic workflow model.
-- `matlab/simulink/run_throughput_analysis.m` — Runs simulation experiments and calculates doctor workload reduction metrics.
-- `matlab/app/NETRA_App.mlapp` — MATLAB App Designer interactive clinical GUI.
+- `matlab/explainability/generate_gradcam.m` — Computes Grad-CAM heatmap using MATLAB `gradCAM()`. [DONE ✅ — Kathan]
+- `matlab/explainability/temperature_scaling.m` — Fits a single temperature to raw logits (NLL), reports ECE before/after. [DONE ✅ — Kathan]
+- `matlab/explainability/apply_temperature.m` — Shared softmax-with-temperature, used at fit and at inference. [DONE ✅ — Kathan]
+- `matlab/explainability/attention_lesion_iou.m` — IoU + attention-mass alignment between Grad-CAM and Phase 3 lesion masks, with a null control. [DONE ✅ — Kathan]
+- `matlab/reporting/generate_pdf_report.m` — Clinical report PDF via `exportgraphics` (base MATLAB, no Report Generator add-on needed). [DONE ✅ — Kathan]
+- `matlab/demo/run_explainability_demo.m` — End-to-end Phase 5 walkthrough on one image. [DONE ✅ — Kathan]
+- `matlab/tests/test_explainability.m` — Unit tests for the above. [DONE ✅ — Kathan]
+- `matlab/simulink/clinic_flow_simulation.slx` — SimEvents discrete-event clinic workflow model. [Team]
+- `matlab/simulink/run_throughput_analysis.m` — Runs simulation experiments and calculates doctor workload reduction metrics. [Team]
+- `matlab/app/NETRA_App.mlapp` — MATLAB App Designer interactive clinical GUI. [Team]
+
+> [!NOTE]
+> **Phase 5 explainability depends on Phase 4's grading model, which is not built
+> yet.** The four files above are written against the interface in
+> [`docs/phase5-interface.md`](../docs/phase5-interface.md) and developed against a
+> throwaway stub (`matlab/explainability/dev/`, random weights). When Phase 4
+> ships `grade_dr_severity`, match that contract, delete `dev/`, and no other
+> Phase 5 code changes. Run `run_explainability_demo` to see the whole chain end
+> to end today.
 
 #### Datasets Required
 
