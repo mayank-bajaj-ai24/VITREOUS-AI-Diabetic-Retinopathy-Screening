@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NETRA Phase 5 — Explainability Code Guide</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#ffffff; --ink:#1c2430; --muted:#5a6675;
+    --line:#e2e6ec; --accent:#1f6feb; --accent-soft:#e8f0fe;
+    --code-bg:#f2f4f7; --code-ink:#0f2033; --kbd:#334155;
+    --ok:#0f7b4f; --warn:#b4690e; --danger:#b3261e;
+    --tbl-head:#eef2f7; --tag:#e8f0fe; --tag-ink:#1f5fbf;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0e1117; --panel:#161b22; --ink:#e6edf3; --muted:#9aa7b4;
+      --line:#273040; --accent:#4c9cff; --accent-soft:#16263f;
+      --code-bg:#0c111a; --code-ink:#d6e2f0; --kbd:#c7d2de;
+      --ok:#3fb984; --warn:#e0a94a; --danger:#ff6a5f;
+      --tbl-head:#1b2230; --tag:#16263f; --tag-ink:#7fb1ff;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px;display:grid;
+    grid-template-columns:260px 1fr;gap:36px;}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr;gap:0}}
+
+  /* Sidebar */
+  aside{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+    padding:26px 10px 40px 0;border-right:1px solid var(--line);}
+  @media(max-width:900px){aside{position:static;height:auto;border-right:none;
+    border-bottom:1px solid var(--line);padding:14px 0}}
+  aside .brand{font-weight:700;font-size:15px;letter-spacing:.02em;margin:0 0 4px}
+  aside .sub{color:var(--muted);font-size:12px;margin:0 0 18px}
+  nav a{display:block;color:var(--muted);text-decoration:none;font-size:13.5px;
+    padding:5px 10px;border-radius:7px;border-left:2px solid transparent}
+  nav a:hover{color:var(--ink);background:var(--accent-soft)}
+  nav a.lvl2{padding-left:22px;font-size:12.5px}
+  nav .grp{font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--muted);margin:16px 10px 6px;opacity:.7}
+
+  /* Main */
+  main{padding:30px 0 90px;min-width:0}
+  header.top{margin-bottom:10px}
+  h1{font-size:30px;line-height:1.2;margin:.1em 0 .2em}
+  .lede{color:var(--muted);font-size:16px;margin:0 0 14px}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 26px}
+  .pill{background:var(--tag);color:var(--tag-ink);border:1px solid var(--line);
+    padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
+  h2{font-size:22px;margin:44px 0 6px;padding-top:12px;border-top:1px solid var(--line)}
+  h3{font-size:17px;margin:26px 0 6px}
+  h4{font-size:14px;margin:18px 0 4px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.05em}
+  p{margin:.5em 0}
+  code{background:var(--code-bg);color:var(--code-ink);padding:.12em .4em;
+    border-radius:5px;font-family:"SF Mono",Consolas,"Roboto Mono",monospace;font-size:.86em}
+  pre{background:var(--code-bg);color:var(--code-ink);padding:14px 16px;border-radius:10px;
+    overflow-x:auto;border:1px solid var(--line);margin:12px 0;font-size:13px;line-height:1.55}
+  pre code{background:none;padding:0;font-size:inherit}
+  .cmt{color:var(--muted);font-style:italic}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:18px 20px;margin:16px 0}
+  .why{border-left:3px solid var(--accent);background:var(--accent-soft);
+    padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0}
+  .why b{color:var(--accent)}
+  .note{border-left:3px solid var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent);
+    padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0}
+  .danger{border-left:3px solid var(--danger);background:color-mix(in srgb,var(--danger) 10%,transparent);
+    padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13.5px;
+    display:block;overflow-x:auto}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:var(--tbl-head);font-weight:600}
+  td code{white-space:nowrap}
+  .status-ok{color:var(--ok);font-weight:600}
+  .status-warn{color:var(--warn);font-weight:600}
+  .filehdr{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .filehdr .path{font-family:"SF Mono",Consolas,monospace;font-size:13px;color:var(--muted)}
+  ul,ol{padding-left:22px} li{margin:3px 0}
+  .kbd{font-family:"SF Mono",Consolas,monospace;background:var(--code-bg);
+    border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.85em}
+  footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);
+    margin-top:50px;padding-top:18px}
+  a.anchor{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<aside>
+  <p class="brand">NETRA · Phase 5</p>
+  <p class="sub">Explainability code guide</p>
+  <nav>
+    <a href="#overview">Overview</a>
+    <a href="#design">The 4 design decisions</a>
+    <div class="grp">Files</div>
+    <a href="#apply" class="lvl2">apply_temperature</a>
+    <a href="#tempscale" class="lvl2">temperature_scaling</a>
+    <a href="#gradcam" class="lvl2">generate_gradcam</a>
+    <a href="#iou" class="lvl2">attention_lesion_iou</a>
+    <a href="#stub" class="lvl2">dev stubs</a>
+    <a href="#report" class="lvl2">generate_pdf_report</a>
+    <a href="#demotest" class="lvl2">demo &amp; tests</a>
+    <div class="grp">Reference</div>
+    <a href="#numbers">Every magic number</a>
+    <a href="#interface">Phase 4 interface</a>
+    <a href="#caveats">Honest caveats</a>
+    <a href="#changelog">Changelog</a>
+  </nav>
+</aside>
+
+<main>
+<header class="top" id="overview">
+  <h1>NETRA Phase 5 — Explainability</h1>
+  <p class="lede">A line-by-line guide to the code: what it does, how it works, why each
+  technology and each number was chosen. Written to be re-read, and updated as the project changes.</p>
+  <div class="meta">
+    <span class="pill">Branch: Kathan</span>
+    <span class="pill">MATLAB R2026a</span>
+    <span class="pill">Owner: Kathan</span>
+    <span class="pill">Last updated: 2026-09-14</span>
+  </div>
+  <div class="card">
+    <b>Scope of this module.</b> Four production files plus a dev stub, a demo and tests:
+    <code>generate_gradcam.m</code>, <code>temperature_scaling.m</code> (+ <code>apply_temperature.m</code>),
+    <code>attention_lesion_iou.m</code>, and <code>generate_pdf_report.m</code>. Together they make the
+    DR grading model <em>explain itself</em>: show where it looked, prove it looked at real disease,
+    and make its confidence number honest — then print all of it on one clinical page.
+  </div>
+  <div class="note"><b>Status:</b> written but not yet run in MATLAB (no MATLAB on the dev machine),
+  and the grade/heatmap are meaningless until Phase 4's grading model exists — the code currently runs
+  against a random-weight <em>stub</em>. Both points are expanded under <a class="anchor" href="#caveats">Honest caveats</a>.</div>
+</header>
+
+<!-- ============ DESIGN ============ -->
+<h2 id="design">The 4 design decisions that shaped everything</h2>
+<p>If you understand these four, the code reads itself. Every file is an expression of them.</p>
+
+<div class="card">
+  <h4>Decision 1 — Cross the Phase&nbsp;4 boundary with plain arrays, never Phase&nbsp;4's objects</h4>
+  <p><code>temperature_scaling</code> takes a <code>logits</code> matrix and a <code>labels</code> vector —
+  not "the Phase 4 model". <code>attention_lesion_iou</code> takes a score map and Phase 3's result — not
+  "the grading pipeline".</p>
+  <div class="why"><b>Why.</b> Phase 4 doesn't exist yet, and we can't know exactly how your teammate will
+  structure it. If my code reached into Phase 4's internals, every wrong guess would break it. Passing plain
+  arrays across the boundary means the worst case is a one-line change in the demo glue — never a rewrite.
+  This is <em>decoupling</em>, and it is the single most important idea in the module.</div>
+</div>
+
+<div class="card">
+  <h4>Decision 2 — Develop against a stub, not against nothing</h4>
+  <p>Grad-CAM needs a real network to run. Rather than wait for Phase 4, I built a tiny fake network
+  (<code>make_stub_grading_net</code>) with the right <em>shape</em> but <em>random weights</em>.</p>
+  <div class="why"><b>Why.</b> It lets every line execute and be tested today. Predictions are meaningless,
+  but the plumbing is real — exactly the "get it running end-to-end, then improve" pattern Phases 3 and 4 recommend.</div>
+</div>
+
+<div class="card">
+  <h4>Decision 3 — Compute everything on the 512×512 canvas</h4>
+  <p>Grad-CAM attention and Phase 3 lesion masks must be compared pixel-to-pixel, so both must live on the
+  same coordinate frame: the enhanced 512 canvas.</p>
+  <div class="why"><b>Why.</b> The plan is explicit — both already share that canvas, so no mask resampling is
+  needed, and I must <em>not</em> map back to the clinician's original image for the <em>metric</em> (that
+  round-trip through <code>invert_geometry</code> is lossy because Phase 2 downsamples). Map back only for
+  <em>display</em>.</div>
+</div>
+
+<div class="card">
+  <h4>Decision 4 — Prefer base MATLAB over add-ons</h4>
+  <p>The PDF report uses <code>exportgraphics</code> (built in) instead of the Report Generator toolbox;
+  calibration uses <code>fminbnd</code> (built in) instead of the Optimization Toolbox.</p>
+  <div class="why"><b>Why.</b> Phases 3 and 4 both lost time to missing add-ons (ONNX converter, pretrained
+  weights). Base-MATLAB code always runs, which for a demo is worth more than polish.</div>
+</div>
+
+<!-- ============ apply_temperature ============ -->
+<h2 id="apply">1 · apply_temperature.m</h2>
+<div class="filehdr"><span class="path">matlab/explainability/apply_temperature.m</span>
+  <span class="status-ok">the foundation · reused everywhere</span></div>
+
+<h3>The concept</h3>
+<p>A classifier outputs <em>logits</em> (raw scores, any real number). Softmax turns them into probabilities.
+Temperature scaling inserts one number <code>T</code>: instead of <code>softmax(logits)</code>, compute
+<code>softmax(logits / T)</code>.</p>
+<ul>
+  <li><code>T = 1</code> → nothing changes.</li>
+  <li><code>T &gt; 1</code> → logits shrink toward 0 → probabilities move toward uniform → <b>less confident</b>.</li>
+  <li><code>T &lt; 1</code> → logits spread apart → <b>more confident</b>.</li>
+</ul>
+<div class="why"><b>Why it can't change the diagnosis.</b> Dividing every logit by the same positive number
+never changes which one is largest. So the predicted grade never moves — only the confidence attached to it.
+That is what makes temperature scaling <em>safe</em>: it cannot turn a "grade 2" into a "grade 3".</div>
+
+<h3>Line by line</h3>
+<pre><code>if ~isscalar(T) || ~isfinite(T) || T &lt;= 0
+    error('NETRA:InvalidTemperature', ...</code></pre>
+<p><code>T</code> must be one positive, finite number. <code>T &le; 0</code> is nonsensical (negative flips the
+ranking; zero divides by zero). I fail loudly with a <code>NETRA:</code> error code, matching the repo convention
+so callers can <code>try/catch</code> on it.</p>
+
+<pre><code>if isvector(logits)
+    logits = logits(:).';
+end</code></pre>
+<p>If someone passes a single image's 5 logits as a column, reshape to one row. Makes the function work for both
+"one sample" and "a whole batch".</p>
+
+<pre><code>z = z - max(z, [], 2);   <span class="cmt">% stability</span>
+e = exp(z);
+probs = e ./ sum(e, 2);</code></pre>
+<p>This is the <b>numerically stable softmax</b> — the one non-obvious part. Softmax is unchanged if you subtract
+any constant from every element (it cancels top and bottom). But computationally <code>exp(1000)</code> overflows
+to <code>Inf</code> → <code>NaN</code>. Subtracting the per-row max makes the largest exponent <code>exp(0)=1</code>,
+so nothing overflows and the result is identical. <code>[],2</code> means "operate along dimension 2" — across
+classes, within each row.</p>
+<div class="why"><b>Why a separate file?</b> Two places apply temperature — <code>temperature_scaling</code> when
+<em>fitting</em> T, and inference code when <em>using</em> the fitted T later. If they drifted apart you'd get
+subtle calibration bugs. One file, one source of truth.</div>
+
+<!-- ============ temperature_scaling ============ -->
+<h2 id="tempscale">2 · temperature_scaling.m</h2>
+<div class="filehdr"><span class="path">matlab/explainability/temperature_scaling.m</span>
+  <span class="status-ok">fits T from held-out logits + labels</span></div>
+
+<div class="why"><b>Why temperature scaling and not something fancier?</b> Modern networks are
+<em>systematically overconfident</em> — the finding of Guo et al., "On Calibration of Modern Neural Networks"
+(2017). For a screening tool the confidence number is <em>clinical information</em>: it decides whether a
+borderline grade is trusted or sent to a human. Temperature scaling is the standard fix because it is the
+<em>minimal</em> correction (one parameter — can't overfit a small validation set), it provably preserves
+accuracy, and Guo et al. showed it beats more complex methods on exactly this problem.</div>
+
+<h3>The three-level settings pattern (used in every file)</h3>
+<pre><code>bounds = local_setting(options, 'Bounds', cfg, {'calibration','temperature_bounds'}, [0.05, 10.0]);</code></pre>
+<p>Reads a setting with a fallback chain: explicit <code>options.Bounds</code> wins → else the config value at
+<code>cfg.calibration.temperature_bounds</code> → else a hardcoded default. So a caller can override per-call,
+the team can set project defaults in the YAML, and the function still works with an empty config.</p>
+
+<h3>Label normalization — the 0-vs-1 trap</h3>
+<pre><code>labels = local_normalise_labels(labels, C, N);   <span class="cmt">% -&gt; N×1 in 1..C</span></code></pre>
+<p>ICDR grades are <b>0–4</b> (medical convention). MATLAB indexing is <b>1–5</b>. Guess wrong and every label is
+off by one → calibration is garbage. So the helper <em>detects</em> the convention: values fitting <code>1..C</code>
+are left; values fitting <code>0..C-1</code> get <code>+1</code>; anything else errors. Your teammate can hand me
+labels in either convention. The test <code>testTemperatureLabelEncodingAgnostic</code> proves both give the
+identical <code>T</code>.</p>
+
+<h3>The objective — negative log-likelihood</h3>
+<pre><code>true_idx = sub2ind([N, C], (1:N).', labels);
+nll = @(T) local_nll(logits, true_idx, T);</code></pre>
+<p><code>sub2ind</code> turns "(row i, true-class column)" into linear indices, so <code>probs(true_idx)</code>
+plucks the probability of the <em>correct</em> answer for every sample at once — no loop. The objective is
+<b>NLL</b> = <code>-mean(log(prob of true class))</code>.</p>
+<div class="why"><b>Why NLL, not "minimize ECE directly"?</b> NLL is smooth and differentiable in T; ECE is
+piecewise-constant (it jumps as samples cross bin boundaries) and is a terrible thing to optimize. Guo et al.
+fit on NLL and <em>report</em> ECE — exactly what this does.</div>
+
+<h3>The optimizer</h3>
+<pre><code>[T, nll_after] = fminbnd(nll, bounds(1), bounds(2));</code></pre>
+<div class="why"><b>Why <code>fminbnd</code>?</b> <code>T</code> is a single scalar and NLL(T) is smooth and
+unimodal (one valley). A bounded 1-D search is exactly the right tool — no gradients, no toolbox add-on, no
+learning rate, and it can't run to infinity. The simple tool is also the correct tool.</div>
+<p><b>Why bounds <code>[0.05, 10]</code>?</b> T must be positive. An overconfident model needs <code>T&gt;1</code>,
+typically 1–3 in practice. <code>10</code> is a generous ceiling — wanting more signals a wrong split.
+<code>0.05</code> guards the underconfident direction. Wide enough never to clip a real answer, bounded enough to
+stay well-posed.</p>
+
+<h3>Expected Calibration Error</h3>
+<pre><code>[conf, pred] = max(probs, [], 2);
+correct = (pred == labels);
+edges = linspace(0, 1, num_bins + 1);
+...
+edges(end) = edges(end) + eps;</code></pre>
+<p>ECE measures the <em>gap between confidence and reality</em>. Group predictions into bins by their confidence
+(top probability). In the "80–87% confident" bin, if the model is actually right 80–87% of the time it's
+well-calibrated there. ECE = average <code>|accuracy − confidence|</code> across bins, weighted by bin size.
+Zero = perfect. The <code>+ eps</code> nudge on the last edge includes a confidence of <em>exactly</em> 1.0,
+which the half-open bins <code>[lo,hi)</code> would otherwise drop.</p>
+<p><b>Why <code>num_bins = 15</code>?</b> The value from Guo et al. 2017 — the field standard: enough bins to
+resolve the curve, few enough that each has samples.</p>
+<p><b>Returns:</b> <code>T</code>, NLL &amp; ECE before/after, accuracy (unchanged — a sanity anchor; if scaling
+moved it, there's a bug), and full per-bin reliability data so you can plot a reliability diagram.</p>
+
+<!-- ============ generate_gradcam ============ -->
+<h2 id="gradcam">3 · generate_gradcam.m</h2>
+<div class="filehdr"><span class="path">matlab/explainability/generate_gradcam.m</span>
+  <span class="status-warn">touches the R2026a gradCAM API</span></div>
+
+<h3>The concept</h3>
+<p>Grad-CAM (Selvaraju et al., 2017) answers "which pixels drove this prediction?". It takes the score for one
+class, computes how sensitive that score is to each feature map in a late convolution layer (the gradient), uses
+those sensitivities as weights, and produces a coarse heatmap. On a retina, a <em>trustworthy</em> grader's heat
+sits on lesions; heat on the border or optic disc is a red flag you can now <em>show</em>.</p>
+<div class="why"><b>Why a late conv layer specifically?</b> Early conv layers see edges/textures (no class
+meaning); the final classifier has lost all spatial layout (a flat vector). The last convolution layer is the
+sweet spot — it still has a spatial grid <em>and</em> carries class meaning. That's also why the result is coarse
+(that grid is small, e.g. 16×16, then upsampled).</div>
+
+<h3>Preparing the canvas</h3>
+<pre><code>canvas = local_prepare_canvas(image_input, cfg, options.Enhanced);   <span class="cmt">% 512×512×3</span></code></pre>
+<p>Reproduces the exact Phase 1 + Phase 2 pipeline (<code>quality_gate</code> then <code>enhance_fundus</code>)
+that the rest of NETRA uses — copied from <code>segment_lesions.m</code> so the canvas is bit-identical. The whole
+point is that the heatmap aligns with Phase 3 masks, and they only align on the identical enhanced 512 canvas.
+If <code>options.Enhanced</code> is true, the caller already has the canvas; we skip re-enhancing and error on a
+size mismatch (a silent misalignment otherwise).</p>
+
+<h3>Resize to the network's own input size</h3>
+<pre><code>net_in = local_net_input_size(net);   <span class="cmt">% reads the input layer's InputSize</span>
+X = imresize(canvas, net_in(1:2));</code></pre>
+<div class="why"><b>Why read the size off the network?</b> ResNet-50 wants 224×224, EfficientNet-B4 wants
+380×380 (a Phase 4 pitfall the plan flags). Instead of hardcoding, I read <code>InputSize</code> from the net's
+input layer, so the same code works for whichever backbone Phase 4 ships. Run at native size, then upsample the
+heatmap back to 512 for mask comparison.</div>
+
+<h3>The prediction (dlnetwork mechanics)</h3>
+<pre><code>dlX = dlarray(single(X), 'SSCB');
+y = predict(net, dlX);
+scores = double(gather(extractdata(y))).';</code></pre>
+<p>A <code>dlnetwork</code> wants a <code>dlarray</code> tagged with a <em>format</em>: <code>'SSCB'</code> =
+Spatial, Spatial, Channel, Batch — "this is an image, H×W×C×batch". <code>extractdata</code> pulls the raw numbers
+out of the returned dlarray; <code>gather</code> brings them off the GPU if there is one; <code>single</code>
+because networks run in single precision.</p>
+
+<h3>The feature layer — deliberately loud</h3>
+<pre><code>if isempty(char(feat_layer))
+    feat_layer = local_last_conv_layer(net);
+    auto_layer = true;
+    warning('NETRA:GradCAMAutoLayer', ...);
+end</code></pre>
+<div class="why"><b>Why warn instead of silently picking?</b> For a two-branch model (ResNet ∥ EfficientNet) the
+layer choice is a real editorial decision, and the report must state <em>which branch</em> it explains. If you set
+the layer (config or <code>g.gradcam_layer</code>), I use it. If not, I auto-detect the last conv layer <em>and
+warn</em> that a final figure should choose deliberately.</div>
+
+<h3>The Grad-CAM call — three R2026a specifics</h3>
+<pre><code>score_map = gradCAM(net, X, class_idx, ...
+    'FeatureLayer', feat_layer, 'ReductionLayer', red_layer);</code></pre>
+<ul>
+  <li>It's <b><code>gradCAM</code></b> — capital CAM. The plan's prose says <code>gradcam</code> in places, which
+  <em>does not exist</em> on R2026a. A documented API correction.</li>
+  <li>I pass the <b>class index</b> and an explicit <b><code>ReductionLayer</code></b> (<code>'softmax'</code>).
+  For a generic <code>dlnetwork</code>, <code>gradCAM</code> must be told which output to reduce over and which conv
+  layer to read; being explicit stops it guessing wrong.</li>
+  <li>It's wrapped in <code>try/catch</code> → <code>NETRA:GradCAMFailed</code> naming both layers and pointing at
+  <code>analyzeNetwork</code>. When a layer name is wrong you get an actionable message, not a cryptic trace.</li>
+</ul>
+
+<h3>Normalize and overlay</h3>
+<pre><code>score_map = local_normalise01(double(score_map));</code></pre>
+<p><code>local_normalise01</code> rescales to <code>[0,1]</code> and handles the flat-map case: a uniform map (max
+== min) would divide by zero → <code>NaN</code>; instead it returns all-zeros. A uniform map is exactly the
+symptom of a wrong layer choice, so this keeps the failure visible instead of poisoning downstream math.</p>
+<pre><code>blended = (1 - alpha) * base + alpha * heat_rgb;   <span class="cmt">% alpha = 0.45</span></code></pre>
+<p><b>Why <code>alpha = 0.45</code>?</b> Below ~0.3 the heat is too faint over a red-orange fundus; above ~0.6 it
+hides the retina. 0.45 keeps both anatomy and attention visible. A legibility choice, config-exposed.</p>
+<p>Returns the map at <em>two</em> resolutions — native and upsampled-to-512 — because the IoU function and the
+overlay both need the 512 version, while the native map is the honest true resolution.</p>
+
+<!-- ============ attention_lesion_iou ============ -->
+<h2 id="iou">4 · attention_lesion_iou.m</h2>
+<div class="filehdr"><span class="path">matlab/explainability/attention_lesion_iou.m</span>
+  <span class="status-ok">the key result of Phase 5</span></div>
+<p>The plan calls this "the most valuable single result in Phase 5" — it is the actual <em>argument</em> that the
+AI is trustworthy: it looks at real disease, not artifacts.</p>
+
+<h3>Restricting to the retina</h3>
+<pre><code>att(~valid_mask) = 0;
+lesion_mask = label_map &gt; 1 &amp; valid_mask;</code></pre>
+<p>Phase 3's label map uses <code>0</code> = outside the retina, <code>1</code> = background inside, <code>2–5</code>
+= the four lesion classes. So <code>label_map &gt; 1</code> is "any lesion" and <code>valid_mask = label_map &gt; 0</code>
+is "inside the retina". Zeroing attention in the black surround stops it inflating every denominator. Tested by
+<code>testAttentionIgnoresOutsideRetina</code>.</p>
+
+<h3>Three measures — and why three, not one</h3>
+<div class="why"><b>The intellectual core.</b> Grad-CAM is <em>coarse</em> (a ~16×16 grid upsampled); lesions are
+<em>tiny</em> (a microaneurysm ≈ 4 pixels). A coarse blob can never tightly tile a 4-pixel dot, so raw IoU looks
+low <em>no matter how good the grader is</em> — a property of the method, not a failure. Reporting only IoU would
+be dishonestly pessimistic. Hence three complementary numbers.</div>
+
+<h4>1 — IoU (the classic, included but understood to be pessimistic)</h4>
+<pre><code>threshold = prctile(att_valid, pctl);   <span class="cmt">% pctl = 90</span>
+hot = att &gt;= threshold &amp; valid_mask;
+iou = intersection(hot, lesions) / union(hot, lesions);</code></pre>
+<p>"Hot" = the top 10% most-attended retina pixels. <b>Why the 90th percentile?</b> It defines "where the model is
+really looking" as the top decile. Too low (50th) → "hot" covers half the retina and means nothing; too high
+(99th) → a few noisy pixels. 90 is the value the plan's snippet uses. Config-exposed.</p>
+
+<h4>2 — attention mass on lesions (the fairer number)</h4>
+<pre><code>attention_mass_on_lesion = sum(att(lesion_mask)) / sum(att(valid_mask));</code></pre>
+<p>"Of all the attention spent anywhere on the retina, what fraction landed on lesion pixels?" This doesn't punish
+the resolution mismatch — it asks the honest question, and it's usually the headline number. The plan explicitly
+recommends reporting it alongside IoU.</p>
+
+<h4>3 — the control (the "compared to what?" guard)</h4>
+<pre><code>control = rot90(lesion_mask, 2);   <span class="cmt">% 180°: same shape, wrong place</span>
+control_iou = local_iou(hot, control &amp; valid_mask);
+lift = iou - control_iou;</code></pre>
+<div class="why"><b>Why a control?</b> A number is meaningless without a baseline. Is IoU 0.15 good? Only if it
+beats IoU against <em>wrong</em> lesions. Rotating the mask 180° gives the same shape and area in the wrong place.
+If true-mask IoU beats the control, alignment is real; if equal, the attention isn't aligned with anything.
+<code>lift &gt; 0</code> is the one-number verdict. (You can also pass another image's mask via
+<code>options.ControlMask</code>; rotation is a self-contained proxy needing no second image.)</div>
+
+<h3>Per-class breakdown</h3>
+<pre><code>for k = 1:n_les
+    cmask = (label_map == classes.lesion_ids(k)) &amp; valid_mask;
+    mass_frac(k) = sum(att(cmask)) / total_mass;
+    class_iou(k) = local_iou(hot, cmask);
+end</code></pre>
+<p>Tells you <em>which lesion type</em> the model attends to — maybe it locks onto bright hard exudates and ignores
+tiny microaneurysms. Clinically meaningful, and the per-class detail the plan insists on ("read per-class metrics,
+not averages"). Class names/ids come from <code>lesion_classes()</code>, never hardcoded, so a scheme change
+follows automatically.</p>
+
+<!-- ============ stub ============ -->
+<h2 id="stub">5 · dev stubs (delete when Phase 4 is real)</h2>
+<div class="filehdr"><span class="path">matlab/explainability/dev/make_stub_grading_net.m · stub_grade_dr_severity.m</span></div>
+<div class="danger"><b>Marked "DELETE WHEN PHASE 4 IS REAL"</b> in both headers so nobody mistakes them for the
+real model.</div>
+
+<h3>The network architecture</h3>
+<pre><code>imageInputLayer([512 512 3], 'Normalization','none', 'Name','input')
+conv(3,8) → relu → maxpool(2)
+conv(3,16) → relu → maxpool(2)
+conv(3,32, 'Name','features')   <span class="cmt">% Grad-CAM target</span>
+relu → globalAveragePooling → fullyConnected(5, 'Name','logits') → softmax('Name','softmax')</code></pre>
+<p><b>Why exactly this shape?</b> The minimum that exercises every Phase 5 path honestly:</p>
+<ul>
+  <li>a named late conv layer <code>"features"</code> → Grad-CAM has a real target;</li>
+  <li>a named <code>"logits"</code> layer (pre-softmax) → temperature scaling has real logits to pull;</li>
+  <li>a <code>"softmax"</code> → the reduction layer exists;</li>
+  <li>two maxpools make the features map 128×128 (512→256→128) — genuinely coarser than input, so Grad-CAM's
+  upsampling path is actually tested;</li>
+  <li>filter counts 8/16/32 are tiny — it exists to run fast, not to classify.</li>
+</ul>
+<p><code>rng(seed)</code> makes the random weights reproducible (a test passing today passes tomorrow). Random
+weights → predictions are noise, which is honest: the stub proves the code runs, never that grading works.</p>
+
+<h3>The stub grader returns the interface contract exactly</h3>
+<p>Fields <code>grade, grade_name, probs, logits, confidence, referable, canvas, gradcam_layer</code>. The most
+important is <code>logits</code> (pre-softmax) — if Phase 4 returned only softmax probabilities, calibration would
+be impossible. Modeling it now forces the interface doc to demand it, so Phase 4 is built correctly the first time.</p>
+<pre><code>grade = idx - 1;   <span class="cmt">% 1-based argmax → 0-based ICDR</span></code></pre>
+<p>The same 0-vs-1 boundary as the calibration code — it appears everywhere ICDR meets MATLAB.</p>
+
+<!-- ============ report ============ -->
+<h2 id="report">6 · generate_pdf_report.m</h2>
+<div class="filehdr"><span class="path">matlab/reporting/generate_pdf_report.m</span>
+  <span class="status-ok">the visible clinical deliverable</span></div>
+
+<div class="why"><b>Why <code>exportgraphics</code>, not Report Generator?</b> Report Generator
+(<code>mlreportgen.*</code>) is a separate add-on <em>not installed</em> on a clean MATLAB — the exact blocker that
+cost Phases 3 and 4. <code>exportgraphics</code> is base MATLAB and writes a vector PDF from any figure. Less fancy,
+but it <em>always works</em>.</div>
+
+<p><b>Layout:</b> a 3×2 tile grid — enhanced fundus, lesion overlay, Grad-CAM, probability bar, and a findings
+text block spanning the bottom. Mirrors Phase 3's <code>run_walkthrough</code>, which the plan suggests as the model.</p>
+
+<h3>The header fix you watched me make</h3>
+<pre><code>h = title(tl, header, 'FontWeight','bold', 'Interpreter','none');</code></pre>
+<p>I first used <code>subtitle(tl, ...)</code>, then corrected it: <code>subtitle</code> isn't reliable on a
+<code>tiledlayout</code> (it's an axes function). Both header lines now go through <code>title</code> as a two-line
+cell array. <code>'Interpreter','none'</code> stops MATLAB reading <code>_</code> in a filename as a LaTeX subscript.</p>
+
+<h3>Lesion overlay</h3>
+<pre><code>chan(mask) = 0.5 * chan(mask) + 0.5 * color(ch);</code></pre>
+<p>Blend each class's canonical color (from <code>lesion_classes()</code>) 50/50 over the fundus. <b>50%</b> so you
+see both the lesion color <em>and</em> the retina underneath (opaque would hide whether the mask is really on a
+lesion). Then <code>overlay_legend</code> — Phase 3's own renderer, reused so colors match every NETRA figure.</p>
+
+<h3>Defensive stat reader</h3>
+<pre><code>st.pixels = local_field(s, {'pixels','pixel_count','area'}, 0);</code></pre>
+<div class="note"><b>Confirm against real <code>r.stats</code> when you run it.</b> I saw the stats described in prose
+("pixels, connected regions, area fraction") but not the literal struct field spellings, so <code>local_field</code>
+tries several plausible names and falls back to 0 (or counts the label map directly). It degrades gracefully instead
+of crashing — but this is a spot to verify.</div>
+
+<h3>Fovea distance in disc diameters</h3>
+<pre><code>d_px = min(sqrt((xx - fx).^2 + (yy - fy).^2));
+dd = d_px / (2 * od.disc_radius);</code></pre>
+<p>Clinicians express lesion location as distance from the fovea in <em>disc diameters</em> (DD) — because the same
+lesion is far more dangerous near the macula. The disc diameter (<code>2 × disc_radius</code>) is the natural ruler.
+I find the nearest lesion pixel to the fovea (both from Phase 3's <code>r.optic_disc</code>) and divide.</p>
+<p><b>Why the <code>&lt; 1.0 DD</code> "sight-threatening" flag?</b> The macula sits roughly within one disc diameter
+of the fovea; a lesion inside that radius implies macular involvement — the sight-threatening case. Clinically
+motivated, stated as such, not tuned. All guarded: a missing fovea (<code>NaN</code>) simply omits the line.</p>
+<p>The <b>disclaimer</b> ("Research prototype. Not a medical device.") is pulled from config and always printed —
+asserting a clinical grade without it is a real problem, so it's structural, not decoration.</p>
+
+<!-- ============ demo & tests ============ -->
+<h2 id="demotest">7 · run_explainability_demo.m &amp; test_explainability.m</h2>
+<div class="filehdr"><span class="path">matlab/demo/run_explainability_demo.m · matlab/tests/test_explainability.m</span></div>
+
+<p><b>The demo</b> runs the whole chain on one image: real Phase 3 segmentation → stub grade → Grad-CAM → IoU →
+calibration → PDF, printing a <code>[n/6]</code> line per step, and ending honestly: "grade and Grad-CAM come from
+an untrained stub model."</p>
+
+<h3>The synthetic overconfident set</h3>
+<pre><code>logits(i, labels(i)) += 2.5;        <span class="cmt">% true class usually wins</span>
+if rand &lt; 0.30                      <span class="cmt">% but 30% of the time...</span>
+    logits(i, wrong) += 3.0;        <span class="cmt">% a wrong class wins bigger</span>
+end
+logits = logits * 4.0;              <span class="cmt">% inflate → overconfidence</span></code></pre>
+<p>No real held-out set exists yet, so I <em>manufacture</em> a classifier that is ~70% accurate but very confident
+(the <code>×4.0</code> makes softmax report near-certainty even when wrong) — precisely the regime temperature
+scaling fixes. Running it <em>demonstrates</em> <code>T&gt;1</code> and a drop in ECE. The numbers only produce that
+qualitative behavior; they're labeled "SYNTHETIC — demo only" and never go in a report.</p>
+
+<h3>Tests split by dependency</h3>
+<ul>
+  <li><b>Hermetic tests</b> (temperature, apply_temperature, attention-IoU, report) build synthetic fixtures and
+  need no model or GPU — they run anywhere. <code>local_aligned_fixture</code> builds a circular retina with a
+  square "haemorrhage" and a Gaussian of attention on it, a case where I <em>know</em> the answer.</li>
+  <li><b>Network tests</b> (stub contract, Grad-CAM shape) need the Deep Learning Toolbox, so they're guarded with
+  <code>assumeTrue(has_dlt, ...)</code> — they <em>skip</em>, not fail, where it's absent.</li>
+</ul>
+<p>Tests check <em>properties</em>, not exact values: rows sum to 1, argmax preserved under scaling,
+<code>T&gt;1</code> for an overconfident set, IoU ∈ [0,1], the PDF exists and is non-empty. Property tests are right
+here because exact numbers depend on random weights.</p>
+
+<!-- ============ numbers ============ -->
+<h2 id="numbers">Every magic number, in one table</h2>
+<table>
+<thead><tr><th>Value</th><th>Where</th><th>Why this value</th></tr></thead>
+<tbody>
+<tr><td><code>ece_bins = 15</code></td><td>calibration</td><td>The value from Guo et al. 2017 — field standard.</td></tr>
+<tr><td><code>temperature_bounds = [0.05, 10]</code></td><td>calibration</td><td>T must be &gt;0; overconfident models land ~1–3; 10 a generous ceiling, 0.05 a floor. Never clips, stays well-posed.</td></tr>
+<tr><td><code>initial_temperature = 1.5</code></td><td>calibration</td><td>Pre-existing in config; a typical overconfident start (unused by fminbnd, kept for reference).</td></tr>
+<tr><td><code>attention_percentile = 90</code></td><td>XAI</td><td>"Hot" = top 10% of attention. The plan's snippet uses 90. Lower dilutes it; higher is noise.</td></tr>
+<tr><td><code>overlay_alpha = 0.45</code></td><td>XAI</td><td>Heat visible without hiding the retina. Legibility, config-exposed.</td></tr>
+<tr><td><code>colormap = jet</code></td><td>XAI/report</td><td>Standard attention colormap (blue→red = cold→hot).</td></tr>
+<tr><td>50% lesion blend</td><td>report</td><td>See both the lesion color and the retina underneath.</td></tr>
+<tr><td><code>&lt; 1.0 disc diameter</code></td><td>report</td><td>The macula lies ~1 DD from the fovea; lesions inside imply macular involvement. Clinical, not tuned.</td></tr>
+<tr><td>stub filters 8/16/32, 2 maxpools</td><td>stub</td><td>Minimum net with a coarse named conv layer + named logits; tiny for test speed.</td></tr>
+<tr><td>synth +2.5 / +3.0 / 30% / ×4.0</td><td>demo/test</td><td>Manufacture a ~70%-accurate but overconfident classifier to demonstrate calibration. Scaffolding only.</td></tr>
+</tbody>
+</table>
+
+<!-- ============ interface ============ -->
+<h2 id="interface">The Phase 4 interface (what my code assumes)</h2>
+<p>Full detail in <code>docs/phase5-interface.md</code>. The essentials Phase 5 needs from Phase 4's
+<code>grade_dr_severity</code>:</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Used by</th></tr></thead>
+<tbody>
+<tr><td><code>g.grade</code></td><td>int 0–4</td><td>report</td></tr>
+<tr><td><code>g.probs</code></td><td>1×5</td><td>report, calibration</td></tr>
+<tr><td><code>g.logits</code> <b>(critical)</b></td><td>1×5 pre-softmax</td><td>temperature scaling — impossible without it</td></tr>
+<tr><td><code>g.confidence</code></td><td>scalar</td><td>report</td></tr>
+<tr><td><code>g.canvas</code></td><td>512×512×3</td><td>Grad-CAM, IoU (shared coordinate frame)</td></tr>
+<tr><td><code>g.gradcam_layer</code></td><td>string</td><td>Grad-CAM (which conv layer / branch)</td></tr>
+</tbody>
+</table>
+<p>Plus, for calibration, a held-out <code>logits</code> (N×5) + <code>labels</code> (N) the model never trained on,
+saved to <code>data/processed/grading/heldout_calibration.mat</code>.</p>
+
+<!-- ============ caveats ============ -->
+<h2 id="caveats">Honest caveats (so you can defend the work)</h2>
+<ol>
+  <li><b>None of this has run in MATLAB</b> — no MATLAB on the dev machine. The two interface points most likely to
+  need a tweak: the exact <code>r.stats</code> field names in the report (coded defensively), and the
+  <code>gradCAM</code> call arguments (signature is right per the plan, but the one API I couldn't execute). Both
+  fail with clear <code>NETRA:</code> messages, not silent wrong output.</li>
+  <li><b>Grade and heatmap are meaningless until Phase 4 exists</b> — random-weight stub. Code paths are real and
+  tested; predictions are not.</li>
+  <li><b>The design is deliberately conservative at the Phase 4 boundary</b> — plain arrays across the interface —
+  so a wrong guess about Phase 4's internals costs a one-line demo change, never a rewrite.</li>
+</ol>
+
+<!-- ============ changelog ============ -->
+<h2 id="changelog">Changelog</h2>
+<p class="lede" style="font-size:14px">This document is updated as the project changes. Newest first.</p>
+<table>
+<thead><tr><th>Date</th><th>Change</th></tr></thead>
+<tbody>
+<tr><td>2026-09-14</td><td>Initial Phase 5 explainability module written and pushed to <code>Kathan</code>:
+Grad-CAM, temperature scaling (+ apply_temperature), attention–lesion IoU, PDF report, dev stub, demo, tests, and
+config sections. This guide created.</td></tr>
+</tbody>
+</table>
+
+<footer>
+  NETRA — National Eye Triage &amp; Retinal Assessment · Phase 5 Explainability · Owner: Kathan ·
+  Kept in sync with the code on the <code>Kathan</code> branch. When we change the module, this file and its
+  changelog are updated in the same commit.
+</footer>
+
+</main>
+</div>
+</body>
+</html>
