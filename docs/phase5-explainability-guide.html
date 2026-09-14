@@ -457,14 +457,24 @@ be impossible. Modeling it now forces the interface doc to demand it, so Phase 4
 cost Phases 3 and 4. <code>exportgraphics</code> is base MATLAB and writes a vector PDF from any figure. Less fancy,
 but it <em>always works</em>.</div>
 
-<p><b>Layout:</b> a 3×2 tile grid — enhanced fundus, lesion overlay, Grad-CAM, probability bar, and a findings
-text block spanning the bottom. Mirrors Phase 3's <code>run_walkthrough</code>, which the plan suggests as the model.</p>
+<p><b>Layout (redesigned after the first run):</b> manual normalized-coordinate positioning rather than a tile
+grid, for full control of a clinical look — a teal <em>header band</em>, a severity-coloured <em>grade badge</em>
+(green→red for ICDR 0→4), a coloured <em>referable</em> strip, three image panels (fundus, lesion overlay,
+Grad-CAM), a per-grade coloured <em>probability chart</em> with % labels, then two <em>findings cards</em> (a
+lesion-burden table and an assessment column) and a footer disclaimer.</p>
 
-<h3>The header fix you watched me make</h3>
-<pre><code>h = title(tl, header, 'FontWeight','bold', 'Interpreter','none');</code></pre>
-<p>I first used <code>subtitle(tl, ...)</code>, then corrected it: <code>subtitle</code> isn't reliable on a
-<code>tiledlayout</code> (it's an axes function). Both header lines now go through <code>title</code> as a two-line
-cell array. <code>'Interpreter','none'</code> stops MATLAB reading <code>_</code> in a filename as a LaTeX subscript.</p>
+<div class="why"><b>Why the redesign?</b> The first PDF rendered washed-out: on a themed host (MATLAB Online's dark
+UI) the figure inherited faint gray text and a black-backed chart while the page was white. The rebuild
+<b>forces a light theme</b> (<code>fig.Theme = 'light'</code>) and sets every colour explicitly, so the report
+looks identical regardless of the host theme.</div>
+
+<h3>Grad-CAM masked to the retina</h3>
+<pre><code>amap = alpha * double(valid);              <span class="cmt">% per-pixel alpha, 0 outside retina</span>
+blended = base .* (1 - amap) + heat_rgb .* amap;</code></pre>
+<p>The raw Grad-CAM overlay painted a bright false rim where stub attention leaked onto the black surround. The
+report now builds its own overlay with a <em>per-pixel</em> alpha that is zero outside the retina
+(<code>valid = label_map &gt; 0</code>), so the surround shows the plain fundus and only real retina carries heat —
+the same "reason only inside the retina" principle as the IoU metric.</p>
 
 <h3>Lesion overlay</h3>
 <pre><code>chan(mask) = 0.5 * chan(mask) + 0.5 * color(ch);</code></pre>
@@ -578,6 +588,11 @@ saved to <code>data/processed/grading/heldout_calibration.mat</code>.</p>
 <table>
 <thead><tr><th>Date</th><th>Change</th></tr></thead>
 <tbody>
+<tr><td>2026-09-14</td><td><b>Report redesign.</b> The first PDF looked washed-out (inherited the host's
+dark UI theme → faint text and a black-backed chart). Rebuilt <code>generate_pdf_report.m</code> with manual layout:
+a teal header band, a severity-coloured grade badge, a referable strip, forced light theme, high-contrast text,
+a per-grade coloured probability chart with % labels, two findings cards (lesion-burden table + assessment), and a
+footer. Grad-CAM is now masked to the retina so the FOV rim artefact is gone.</td></tr>
 <tr><td>2026-09-14</td><td><b>Validated.</b> All 14 unit tests pass on MATLAB Online R2026a (Update 5), and
 <code>run_explainability_demo</code> runs the full chain on sample image <code>000c1434d8d7.png</code> and writes a
 PDF report. Grad-CAM API and the report's stats reader both confirmed working. Calibration on the synthetic set:
