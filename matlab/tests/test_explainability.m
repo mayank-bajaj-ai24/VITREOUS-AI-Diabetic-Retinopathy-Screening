@@ -13,7 +13,10 @@ proj_root = fullfile(script_dir, '..', '..');
 addpath(genpath(fullfile(proj_root, 'matlab')));
 testCase.TestData.proj_root = proj_root;
 testCase.TestData.cfg = load_config(fullfile(proj_root, 'configs', 'default_config.yaml'));
-testCase.TestData.has_dlt = ~isempty(ver('deeplearning'));
+% Detect the Deep Learning Toolbox by the functions we actually use, not by
+% ver('deeplearning') -- that identifier returns empty on R2026a even when the
+% toolbox is installed, which would silently skip every network test.
+testCase.TestData.has_dlt = ~isempty(which('dlnetwork')) && ~isempty(which('gradCAM'));
 end
 
 % ─── apply_temperature ────────────────────────────────────────────────────
@@ -175,19 +178,29 @@ end
 
 function [att, r] = local_aligned_fixture()
 % A 512 canvas with a circular retina, a background, and one square lesion
-% block; attention is a Gaussian centred on that block.
+% block; attention is a tight Gaussian centred on that block.
+%
+% Two properties matter for the test to be meaningful:
+%   - The lesion is placed OFF-CENTRE. The IoU control rotates the mask 180°
+%     about the image centre; a centred lesion would map almost onto itself and
+%     the control would be indistinguishable from the truth (no lift).
+%   - The attention Gaussian is NARROW (sigma 12) relative to the 61-px block,
+%     so the bulk of its mass lands inside the lesion. A wide Gaussian spills
+%     onto background and drives attention_mass_on_lesion down for reasons that
+%     have nothing to do with the code under test.
 S = 512;
 [xx, yy] = meshgrid(1:S, 1:S);
 retina = (xx - S/2).^2 + (yy - S/2).^2 <= (S/2 - 10)^2;
 
+cx = 330; cy = 330;                            % lesion centroid, off-centre
 label_map = zeros(S, S);
 label_map(retina) = 1;                         % background inside retina
 les = false(S, S);
-les(240:280, 240:280) = true;                  % a haemorrhage-sized block
+les(cy-30:cy+30, cx-30:cx+30) = true;          % 61x61 haemorrhage-sized block
 les = les & retina;
 label_map(les) = 3;                            % class 3 = haemorrhage
 
-att = exp(-((xx - 260).^2 + (yy - 260).^2) / (2 * 30^2));
+att = exp(-((xx - cx).^2 + (yy - cy).^2) / (2 * 12^2));
 
 r = struct();
 r.label_map = label_map;
@@ -198,7 +211,7 @@ r.stats = struct( ...
                             'area_fraction', nnz(les) / nnz(retina)), ...
     'hard_exudate',  struct('pixels', 0, 'regions', 0, 'area_fraction', 0), ...
     'soft_exudate',  struct('pixels', 0, 'regions', 0, 'area_fraction', 0));
-r.optic_disc = struct('fovea_center', [260, 260], 'disc_radius', 30, ...
+r.optic_disc = struct('fovea_center', [cx, cy], 'disc_radius', 30, ...
     'disc_mask', false(S, S), 'exclusion_mask', false(S, S));
 end
 
