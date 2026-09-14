@@ -131,9 +131,12 @@
     DR grading model <em>explain itself</em>: show where it looked, prove it looked at real disease,
     and make its confidence number honest — then print all of it on one clinical page.
   </div>
-  <div class="note"><b>Status:</b> written but not yet run in MATLAB (no MATLAB on the dev machine),
-  and the grade/heatmap are meaningless until Phase 4's grading model exists — the code currently runs
-  against a random-weight <em>stub</em>. Both points are expanded under <a class="anchor" href="#caveats">Honest caveats</a>.</div>
+  <div class="card" style="border-color:var(--ok)"><b style="color:var(--ok)">Status: validated ✓</b> —
+  run on MATLAB Online (R2026a, Update 5) with Deep Learning, Image Processing and Statistics toolboxes. All 14
+  unit tests pass, and <code>run_explainability_demo</code> runs the full chain on a real fundus image and writes
+  a PDF report (temperature scaling fitted T = 2.93, ECE 0.202 → 0.071). The grade and heatmap remain meaningless
+  until Phase 4's grading model exists — the code runs against a random-weight <em>stub</em>. See
+  <a class="anchor" href="#caveats">Honest caveats</a>.</div>
 </header>
 
 <!-- ============ DESIGN ============ -->
@@ -558,10 +561,11 @@ saved to <code>data/processed/grading/heldout_calibration.mat</code>.</p>
 <!-- ============ caveats ============ -->
 <h2 id="caveats">Honest caveats (so you can defend the work)</h2>
 <ol>
-  <li><b>None of this has run in MATLAB</b> — no MATLAB on the dev machine. The two interface points most likely to
-  need a tweak: the exact <code>r.stats</code> field names in the report (coded defensively), and the
-  <code>gradCAM</code> call arguments (signature is right per the plan, but the one API I couldn't execute). Both
-  fail with clear <code>NETRA:</code> messages, not silent wrong output.</li>
+  <li><b>Validated on MATLAB Online R2026a (2026-09-14).</b> All 14 unit tests pass and the end-to-end demo runs
+  and writes a PDF. The two interface points I flagged as risky both held up in practice: the <code>gradCAM</code>
+  call (verified by <code>testGradCAMShapeAndRange</code>) and the report's defensive <code>r.stats</code> reader
+  (the demo rendered a report without error). They still fail loudly with <code>NETRA:</code> messages if a future
+  change breaks them.</li>
   <li><b>Grade and heatmap are meaningless until Phase 4 exists</b> — random-weight stub. Code paths are real and
   tested; predictions are not.</li>
   <li><b>The design is deliberately conservative at the Phase 4 boundary</b> — plain arrays across the interface —
@@ -574,6 +578,10 @@ saved to <code>data/processed/grading/heldout_calibration.mat</code>.</p>
 <table>
 <thead><tr><th>Date</th><th>Change</th></tr></thead>
 <tbody>
+<tr><td>2026-09-14</td><td><b>Validated.</b> All 14 unit tests pass on MATLAB Online R2026a (Update 5), and
+<code>run_explainability_demo</code> runs the full chain on sample image <code>000c1434d8d7.png</code> and writes a
+PDF report. Grad-CAM API and the report's stats reader both confirmed working. Calibration on the synthetic set:
+T = 2.93, ECE 0.202 → 0.071. Guide status updated to "validated".</td></tr>
 <tr><td>2026-09-14</td><td>First MATLAB Online run (R2026a, all toolboxes present). Fixed two <em>test</em>
 bugs found — the actual functions were correct: (1) the IoU test fixture placed the lesion at the image centre, so
 the 180° rotation control mapped it onto itself (no lift), and used a σ=30 attention Gaussian too wide to concentrate
