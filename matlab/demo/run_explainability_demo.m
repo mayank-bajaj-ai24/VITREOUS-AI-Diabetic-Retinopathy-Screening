@@ -97,9 +97,16 @@ fprintf('[5/6] Temperature scaling (%s)...\n', src);
 cal = temperature_scaling(logits, labels, cfg);
 fprintf('       T = %.2f, ECE %.3f -> %.3f\n', cal.T, cal.ece_before, cal.ece_after);
 
-% Calibrated confidence to display on the report.
+% Confidence to display on the report. Only show a *calibrated* confidence when
+% the temperature was fitted on a real held-out set; a temperature from the
+% synthetic demonstration set must not be presented as a real calibrated number.
+is_synth_cal = contains(src, 'SYNTHETIC');
 cal_probs = apply_temperature(log(max(gprobs, 1e-12)), cal.T);
-cal_conf  = max(cal_probs);
+if is_synth_cal
+    disp_conf = g.confidence;       % raw; synthetic T is illustrative only
+else
+    disp_conf = max(cal_probs);     % genuinely calibrated
+end
 
 % ─── 6. PDF report ───────────────────────────────────────────────────────
 fprintf('[6/6] PDF report...\n');
@@ -107,7 +114,7 @@ out_dir = fullfile(root, 'data', 'processed', 'reports');
 [~, name] = fileparts(image_path);
 out_pdf = fullfile(out_dir, ['report_' name '.pdf']);
 xai = struct('gradcam', gc, 'iou', iou, 'calibration', cal, 'quality', local_quality(g));
-ropts = struct('ImageName', [name '.png'], 'Confidence', cal_conf);
+ropts = struct('ImageName', [name '.png'], 'Confidence', disp_conf);
 if isempty(gc)
     % No Grad-CAM result to carry the canvas; enhance once for the report.
     ropts.Canvas = local_enhance_canvas(image_path, cfg);
@@ -115,10 +122,13 @@ end
 out_path = generate_pdf_report(out_pdf, r, g, xai, cfg, ropts);
 fprintf('       written: %s\n', out_path);
 
-if is_real
-    fprintf('Done. Grade is from the trained Phase 4 model; calibrated confidence %.1f%%.\n', 100 * cal_conf);
+if is_real && ~is_synth_cal
+    fprintf('Done. Grade from the trained Phase 4 model; calibrated confidence %.1f%%.\n', 100 * disp_conf);
+elseif is_real
+    fprintf(['Done. Grade from the trained Phase 4 model; confidence %.1f%% (raw). ' ...
+             'Calibration shown is illustrative — no real held-out set yet.\n'], 100 * disp_conf);
 else
-    fprintf('Done. NOTE: grade and Grad-CAM come from an untrained stub model.\n');
+    fprintf('Done. NOTE: grade and attention come from an untrained stub model.\n');
 end
 end
 
