@@ -56,22 +56,21 @@ show the mechanics.
 
 The grading model (`build_hybrid_model`) wraps each backbone in a `networkLayer`
 (`resnet`, `effnet`), so its convolution layers are **nested**, not on the
-top-level graph. `generate_gradcam` now recurses into those branches to find a
-feature layer and returns a hierarchical `branch/layer` name.
+top-level graph. Running the real model **confirmed that `gradCAM` cannot address
+a convolution nested inside a `networkLayer`** — it fails with "Layer … does not
+exist" for any spelling of the nested name.
 
-**This is the piece still to be validated on the real trained model.** It is
-untested because the trained grading `.mat` (`dr_grading_hires.mat` /
-`dr_grading.mat`) is **not in the repo** — it lives on the training machine. Two
-things to confirm once it is available:
+**Resolution: `generate_gradcam` falls back to occlusion sensitivity.** It tries
+Grad-CAM first (works on a flat network), and on failure computes an
+`occlusionSensitivity` map instead — a model-agnostic attention method that only
+calls `predict`, so nesting is no obstacle. The map is consumed identically by
+the attention-IoU, the overlay and the report (which labels the panel by method).
+It is deliberately coarse (large patch/stride) for speed on CPU. Tunable via
+`explainability.occlusion_mask` / `occlusion_stride`.
 
-1. Whether `gradCAM` accepts the hierarchical feature-layer name for a nested
-   `networkLayer`. If not, the fallback is to explain a single backbone with a
-   grade-linked score, or to rebuild the branch un-nested for explanation.
-2. Which branch to explain in the report (the plan requires stating which).
-
-Grad-CAM applies only to the **end-to-end** model. On a **frozen-feature** model
-the head is trained on pooled vectors with no spatial map, so the demo skips
-Grad-CAM (and the attention-IoU) in that mode.
+Grad-CAM/occlusion applies only to the **end-to-end** model. On a
+**frozen-feature** model the head is trained on pooled vectors with no spatial
+map, so the demo skips attention (and the attention-IoU) in that mode.
 
 ## 4. The development stub — now a fallback, not scaffolding
 

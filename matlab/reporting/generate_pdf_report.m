@@ -120,9 +120,12 @@ annotation(fig, 'line', [0.03 0.97], [0.872 0.872], 'Color', line);
 % ── Image panels ──
 local_panel(fig, canvas,         [0.035 0.63 0.44 0.225], 'Enhanced fundus  ·  Phase 2', ink);
 local_panel(fig, lesion_overlay, [0.525 0.63 0.44 0.225], 'Lesion segmentation  ·  Phase 3', ink);
-gc_title = 'Grad-CAM attention  ·  Phase 5';
-if isfield(xai, 'gradcam') && isfield(xai.gradcam, 'feature_layer')
-    gc_title = sprintf('%s  (layer "%s")', gc_title, char(xai.gradcam.feature_layer));
+gc_title = 'Attention map  ·  Phase 5';
+if isfield(xai, 'gradcam') && isfield(xai.gradcam, 'method') && ...
+        xai.gradcam.method == "occlusion-sensitivity"
+    gc_title = 'Occlusion sensitivity  ·  Phase 5';
+elseif isfield(xai, 'gradcam') && isfield(xai.gradcam, 'overlay')
+    gc_title = 'Grad-CAM attention  ·  Phase 5';
 end
 local_panel(fig, gradcam_img,    [0.035 0.375 0.44 0.225], gc_title, ink);
 

@@ -572,13 +572,19 @@ But for a softmax, <code>log(p_i) = z_i − logsumexp(z)</code> — the log-prob
 <code>z</code>. So no change to Phase 4 is needed — <code>collect_grading_logits</code> just takes
 <code>log(probabilities)</code> over the held-out split.</div>
 
-<h3>Grad-CAM on the nested hybrid — the open item</h3>
+<h3>Grad-CAM on the nested hybrid — resolved with an occlusion fallback</h3>
 <p>The grading model wraps each backbone in a <code>networkLayer</code> (<code>resnet</code>, <code>effnet</code>),
-so its conv layers are nested, not on the top-level graph. <code>generate_gradcam</code> now recurses into those
-branches and returns a hierarchical <code>branch/layer</code> name. This is <b>untested on the real model</b>,
-because the trained <code>.mat</code> is not in the repo — it lives on the training machine. To validate it we need
-Aadi to push <code>dr_grading_hires.mat</code>. Until then the demo falls back to the stub, so the pipeline still
-runs, and Grad-CAM/IoU are exercised on the stub while calibration and the report run on whatever grade is produced.</p>
+so its conv layers are nested, not on the top-level graph. Running it confirmed the fear: <code>gradCAM</code>
+<b>cannot address a convolution nested inside a <code>networkLayer</code></b> — it fails with "Layer … does not
+exist", regardless of how the name is spelled.</p>
+<div class="why"><b>The fix — fall back to occlusion sensitivity.</b> Instead of fighting the layer addressing,
+<code>generate_gradcam</code> now tries Grad-CAM first and, on failure, computes an <b>occlusion-sensitivity</b> map:
+it slides an occluding patch across the image and measures how much each position's removal drops the predicted
+class score — the regions that hurt the score most are the ones the model relies on. Crucially it calls the network
+<em>only</em> through <code>predict</code>, so a nested architecture is no obstacle. It is a standard, citable XAI
+method, deliberately coarse (large patch/stride) to stay fast on CPU and to match Grad-CAM's own resolution. The
+attention-IoU, the overlay and the report all consume the resulting map unchanged; the report simply labels the
+panel "Occlusion sensitivity" instead of "Grad-CAM". A flat network (like the dev stub) still uses true Grad-CAM.</div>
 
 <!-- ============ caveats ============ -->
 <h2 id="caveats">Honest caveats (so you can defend the work)</h2>
@@ -600,6 +606,12 @@ runs, and Grad-CAM/IoU are exercised on the stub while calibration and the repor
 <table>
 <thead><tr><th>Date</th><th>Change</th></tr></thead>
 <tbody>
+<tr><td>2026-09-22</td><td><b>Real model runs; Grad-CAM fallback added.</b> The 111 MB trained model was pushed
+(Git LFS) and the demo now grades for real (sample image → Severe NPDR, 76.7%). Confirmed the open item:
+<code>gradCAM</code> <em>cannot</em> address a convolution nested inside a <code>networkLayer</code> ("Layer does
+not exist"), so on the hybrid <code>generate_gradcam</code> now falls back automatically to <b>occlusion
+sensitivity</b> — a model-agnostic attention method that only calls <code>predict</code>, so nesting is no
+obstacle. The IoU, overlay and report consume the map unchanged; the report labels the panel by method.</td></tr>
 <tr><td>2026-09-22</td><td><b>Phase 4 integration.</b> Aadi's real grading model (dual-branch ResNet-50 +
 EfficientNet-b0, held-out IDRiD QWK 0.76) merged from <code>main</code> into <code>Kathan</code>. Rewired Phase 5
 to the delivered <code>grade_dr_severity</code> interface, which differs from the drafted contract: it returns

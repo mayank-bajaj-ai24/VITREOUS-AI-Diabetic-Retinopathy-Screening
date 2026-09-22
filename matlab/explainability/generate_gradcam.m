@@ -96,31 +96,34 @@ if class_idx < 1 || class_idx > C
     error('NETRA:BadClassIdx', 'ClassIdx %d is outside 1..%d.', class_idx, C);
 end
 
-% ─── Resolve the feature layer ───────────────────────────────────────────
-auto_layer = false;
-if isempty(char(feat_layer))
-    feat_layer = local_last_conv_layer(net);
-    auto_layer = true;
-    warning('NETRA:GradCAMAutoLayer', ...
-        ['No feature layer set; auto-detected the last convolution layer "%s". ' ...
-         'For a two-branch grading model, set explainability.feature_layer (or ' ...
-         'g.gradcam_layer) deliberately and state which branch the report ' ...
-         'explains.'], feat_layer);
-end
-
-% ─── Grad-CAM ────────────────────────────────────────────────────────────
-% Label form with an explicit feature and reduction layer is the reliable call
-% for a dlnetwork; the numeric class index selects which output element to
-% differentiate. gradCAM returns a map at the network input resolution.
+% ─── Attention map ───────────────────────────────────────────────────────
+% Grad-CAM when we can address a convolution feature layer, else occlusion
+% sensitivity as a fallback. The Phase 4 hybrid wraps each backbone in a
+% networkLayer, and gradCAM cannot address a convolution nested inside one, so
+% on that model this falls through to occlusion, which needs no internal-layer
+% access and produces an equivalent attention map (coarser, like Grad-CAM).
+explicit = char(feat_layer);
+method = "grad-cam";
+used_layer = string(explicit);
 try
-    score_map = gradCAM(net, X, class_idx, ...
-        'FeatureLayer', feat_layer, 'ReductionLayer', red_layer);
-catch ME
-    error('NETRA:GradCAMFailed', ...
-        ['gradCAM failed on feature layer "%s", reduction layer "%s": %s\n' ...
-         'Check both layer names exist in the network (analyzeNetwork) and ' ...
-         'that the feature layer is a convolution layer late in the graph.'], ...
-        feat_layer, red_layer, ME.message);
+    if ~isempty(explicit)
+        % Caller/config named a top-level conv layer: the reliable dlnetwork call.
+        score_map = gradCAM(net, X, class_idx, ...
+            'FeatureLayer', explicit, 'ReductionLayer', red_layer);
+    else
+        % No layer named: let gradCAM pick its own. If it cannot (nested hybrid),
+        % the error is caught below and occlusion takes over.
+        score_map = gradCAM(net, X, class_idx, 'ReductionLayer', red_layer);
+        used_layer = "auto";
+    end
+catch ME_grad
+    warning('NETRA:GradCAMFallback', ...
+        ['Grad-CAM could not run (%s). Falling back to occlusion sensitivity, ' ...
+         'which needs no internal-layer access and works on the nested hybrid.'], ...
+        ME_grad.message);
+    score_map = local_occlusion(net, X, class_idx, cfg);
+    method = "occlusion-sensitivity";
+    used_layer = "";
 end
 
 score_map = local_normalise01(double(score_map));
@@ -137,9 +140,10 @@ result.canvas           = canvas;
 result.class_idx        = class_idx;
 result.predicted_idx    = predicted_idx;
 result.scores           = scores;
-result.feature_layer    = string(feat_layer);
+result.method           = method;
+result.feature_layer    = used_layer;
 result.reduction_layer  = string(red_layer);
-result.auto_layer       = auto_layer;
+result.auto_layer       = used_layer == "auto" | method == "occlusion-sensitivity";
 end
 
 % ───────────────────────── helpers ──────────────────────────────────────
@@ -202,40 +206,26 @@ y = gather(extractdata(y));
 scores = double(y(:)).';
 end
 
-function name = local_last_conv_layer(net)
-% Name of the last 2-D convolution layer in the graph -- the usual Grad-CAM
-% target. Recurses into nested networkLayer branches, because the Phase 4 hybrid
-% wraps each backbone (resnet, effnet) in a networkLayer, so its conv layers do
-% not appear at the top level. Returns a hierarchical "branch/layer" name in
-% that case. Falls back to grouped convolutions.
-name = local_scan_conv(net.Layers, '');
-if isempty(name)
-    error('NETRA:NoConvLayer', ...
-        'No convolution layer found to use as the Grad-CAM feature layer.');
+function m = local_occlusion(net, X, class_idx, cfg)
+% OCCLUSION SENSITIVITY fallback. Slides an occluding patch over the image and
+% measures the resulting drop in the class score; regions whose occlusion hurts
+% the score most are the ones the model relies on. It calls the network only
+% through predict, so nested networkLayer branches are no obstacle -- unlike
+% gradCAM, which must name an internal convolution layer.
+%
+% Deliberately coarse (large patch and stride) so it stays fast on CPU and
+% matches Grad-CAM's own resolution; the map is upsampled back to the input size.
+insz = size(X, 1);
+mask_sz   = local_cfg(cfg, {'explainability', 'occlusion_mask'},   max(8, round(insz / 8)));
+stride_sz = local_cfg(cfg, {'explainability', 'occlusion_stride'}, max(8, round(insz / 10)));
+try
+    m = occlusionSensitivity(net, single(X), class_idx, ...
+        'MaskSize', mask_sz, 'Stride', stride_sz, 'OutputUpsampling', 'bilinear');
+catch
+    % Fall back to the bare signature if the name-value options are not accepted.
+    m = occlusionSensitivity(net, single(X), class_idx);
 end
-end
-
-function name = local_scan_conv(layers, prefix)
-name = '';
-for i = 1:numel(layers)
-    L = layers(i);
-    if isa(L, 'nnet.cnn.layer.Convolution2DLayer') || ...
-       isa(L, 'nnet.cnn.layer.GroupedConvolution2DLayer')
-        name = local_join(prefix, L.Name);
-    elseif isprop(L, 'Network') && isa(L.Network, 'dlnetwork')
-        % Nested network (a hybrid branch): search inside and keep its name if it
-        % holds a convolution deeper in the graph than anything at this level.
-        try
-            inner = local_scan_conv(L.Network.Layers, local_join(prefix, L.Name));
-            if ~isempty(inner), name = inner; end
-        catch
-        end
-    end
-end
-end
-
-function s = local_join(prefix, name)
-if isempty(prefix), s = name; else, s = [prefix '/' name]; end
+m = double(m);
 end
 
 function m = local_normalise01(m)
