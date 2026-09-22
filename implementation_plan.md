@@ -100,7 +100,7 @@ before designing around them.
 | This plan says | Reality on MATLAB R2026a |
 |---|---|
 | `importONNXNetwork` | **Does not exist.** Requires the Deep Learning Toolbox Converter for ONNX Model Format add-on, which is not installed. The PyTorch export route is unavailable. |
-| `efficientnetb4` | **Does not exist.** Reached through `imagePretrainedNetwork("efficientnetb4")`. |
+| `efficientnetb4` | **Not a valid network name at all on this install** (Phase 4 verified: `imagePretrainedNetwork("efficientnetb4")` errors with *Unsupported network name*, not an add-on prompt). Only `efficientnetb0` exists; the hybrid model falls back to it, giving a 3328-d fused vector instead of 3840-d. |
 | `gradcam` | Actually **`gradCAM`**, capital CAM. |
 | `trainNetwork` | Legacy, and **cannot take a custom loss function**. Use `trainnet`. Phase 3 needs a custom loss and uses it. |
 | `unetLayers` | Exists but builds a **plain U-Net**, one skip per resolution. Calling that UNet++ would not be true. Phase 3 builds the nested lattice directly in `unetpp_layers.m`. |
@@ -360,11 +360,22 @@ Optic disc suppression raises hard exudate precision from 0.616 to 0.630 with **
 | 3 | Severe NPDR | Intraretinal hemorrhages, venous beading |
 | 4 | PDR | Neovascularization / vitreous hemorrhage |
 
-#### Proposed MATLAB Files
-- `matlab/classification/build_hybrid_model.m` — Constructs the dual-branch DAG network in MATLAB.
-- `matlab/classification/train_dr_classifier.m` — Two-stage training script: Pretrain on enhanced APTOS 2019 → Fine-tune on enhanced IDRiD using `trainingOptions('adam', ...)`.
-- `matlab/classification/grade_dr_severity.m` — Takes enhanced image, runs forward pass, returns DR Grade (0–4) and raw probability scores.
-- `matlab/tests/test_classification.m` — Unit test for grading classifier.
+#### MATLAB Files
+- `matlab/classification/build_hybrid_model.m` — Dual-branch ResNet-50 + EfficientNet `dlnetwork`, single 512 input, per-branch resize, feature fusion, plan's head. [COMPLETED ✅]
+- `matlab/classification/train_dr_classifier.m` — Two-stage trainer (APTOS → IDRiD), `trainnet`, saves after each stage, records provenance. Supports both frozen-feature (Step 4a) and end-to-end (Step 4b) modes. [COMPLETED ✅]
+- `matlab/classification/grade_dr_severity.m` — Inference; runs Phase 1 + Phase 2 itself and raises `NETRA:QualityGateFailed` on an ungradeable image, mirroring `segment_lesions`. Returns grade 0–4, probabilities, confidence. [COMPLETED ✅]
+- `matlab/tests/test_classification.m` — 18 unit tests; all pass without the support packages or any downloaded dataset. [COMPLETED ✅]
+
+Supporting files added while building the phase:
+- `matlab/classification/dr_classes.m` — Single source of truth for the ICDR 0–4 scheme and the referable-DR threshold (grade ≥ 2), the Phase 4 analogue of `lesion_classes.m`.
+- `matlab/classification/prepare_grading_dataset.m` — Applies the section 3 data-flow rule (Phase 1 gate → Phase 2 enhancement → enhanced 512×512 + manifest) to APTOS, IDRiD grading and DDR grading. Reports the per-dataset quality-gate rejection rate.
+- `matlab/classification/dr_feature_nets.m` — Loads and truncates both backbones to their pooled feature, shared by the end-to-end and frozen paths so they cannot drift apart. Owns the EfficientNet-B4→B0 fallback.
+- `matlab/classification/build_classifier_head.m` — The fusion head as a standalone `dlnetwork` (trained alone in Step 4a, reused as the tail in Step 4b).
+- `matlab/classification/extract_features.m` — Runs both backbones once to cache fused features for the frozen baseline.
+- `matlab/classification/grading_loss.m` — Class-weighted cross-entropy for `trainnet`.
+- `matlab/classification/multiclass_qwk.m` — Quadratic weighted kappa (MATLAB has none built in).
+- `matlab/classification/grading_metrics.m` — Full evaluation: confusion matrix, QWK, per-class recall, referable sensitivity/specificity against the plan's targets.
+- `matlab/demo/run_dr_training.m` — Runner mirroring `run_training.m`.
 
 #### Datasets Required
 
@@ -524,6 +535,63 @@ images into training, and produced numbers comparable to nothing.
 - **APTOS and IDRiD grade differently in practice** even under the same ICDR
   scale, since they come from different populations and graders. Expect
   fine-tuning to move the numbers more than you would predict.
+
+#### Phase 4 Status & Results (As Built, 2026-09)
+
+**Trained and evaluated.** The earlier blockers are resolved: the pretrained
+support packages (ResNet-50, EfficientNet-b0) and the Parallel Computing Toolbox
+are installed, and an RTX 4050 Laptop GPU is used for feature extraction and
+training. `efficientnetb4` is still not a valid name on R2026a, so the build
+auto-falls back to `efficientnetb0` — the fused vector is **3328-d (2048 + 1280)**,
+measured from the built network (`cfg.models.grading.fused_features` stays 3840
+as the documented B4 target; a warning fires on the mismatch).
+
+**How it runs now:**
+
+```matlab
+cd matlab/demo
+run_dr_training     % prep (Phase 1+2 @640) -> 3-stage frozen train -> held-out eval
+run_dr_finetune     % optional: end-to-end backbone fine-tune (GPU), warm curriculum
+```
+
+`run_dr_training` prepares each dataset at a bounded input resolution
+(`enhancement.grading_input_max_dim = 640`, so prep is ~3 s/img instead of ~15),
+class-balances DDR (`MaxPerClass = 1000`), then trains a three-stage curriculum
+— **APTOS → balanced DDR → IDRiD** — and evaluates on IDRiD's held-out test split.
+
+**Held-out IDRiD test results (frozen features), by data added:**
+
+| Model | QWK | Ref. sens | Ref. spec | Acc |
+|---|---|---|---|---|
+| IDRiD only (Step 4a) | 0.283 | 0.746 | 0.436 | 0.333 |
+| + APTOS pretrain | 0.374 | 0.873 | 0.359 | 0.373 |
+| **+ balanced DDR (3-stage)** | **0.490** | 0.810 | 0.513 | 0.353 |
+
+Data scaling lifts QWK monotonically (0.28 → 0.37 → 0.49). Still below the plan's
+targets (QWK ≥ 0.88, sens ≥ 0.90, spec ≥ 0.85). **Grade 1 (mild) stays at ~0
+recall**: it is defined by ~1-pixel microaneurysms that are washed out when the
+backbones resize to 224 and are invisible to frozen ImageNet features. Closing
+that needs **end-to-end fine-tuning at higher resolution** — the main open lever.
+
+**Fixes made while getting here (all in the codebase, covered by new regression
+tests in `test_classification`):**
+
+- `train_dr_classifier` — one-hot targets must be **rows** for `trainnet` to form
+  the mini-batch (both the frozen feature datastore and the end-to-end image
+  datastore had column targets); and the fused ImageNet features must be
+  **z-scored** or the head does not train (flat loss, collapse to grade 0). The
+  head bakes the training-set stats into its input layer (`build_classifier_head`
+  `Mean`/`Std`), and the frozen head uses **LR 1e-3**, not the 1e-4 backbone rate.
+- `prepare_grading_dataset` — added `MaxInputDim` (prep speed), `MaxPerClass`
+  (DDR balancing) and a per-image **try/catch** so one bad image cannot abort a
+  multi-hour run; fixed a **quadratic DDR discovery hang** (labels sit above the
+  `train/`/`valid/`/`test/` image folders, so the resolver must look there first).
+- `configs/default_config.yaml` — added the missing **`borderline` enhancement
+  profile** (`select_profile` returns four bands; only three were defined, so the
+  worst-quality images crashed enhancement) and `grading_input_max_dim`.
+
+Targets and `grading_metrics` (QWK + full confusion matrix + referable
+sens/spec, per Step 6) are unchanged.
 
 ---
 
@@ -781,10 +849,18 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 │   │   ├── estimate_fov_mask.m
 │   │   ├── tile_image.m
 │   │   └── stitch_tiles.m
-│   ├── classification/                 # Phase 4: DR Severity Grading
+│   ├── classification/                 # Phase 4: DR Severity Grading [DONE ✅]
+│   │   ├── dr_classes.m
+│   │   ├── prepare_grading_dataset.m
+│   │   ├── dr_feature_nets.m
+│   │   ├── build_classifier_head.m
 │   │   ├── build_hybrid_model.m
+│   │   ├── extract_features.m
+│   │   ├── grading_loss.m
 │   │   ├── train_dr_classifier.m
-│   │   └── grade_dr_severity.m
+│   │   ├── grade_dr_severity.m
+│   │   ├── multiclass_qwk.m
+│   │   └── grading_metrics.m
 │   ├── explainability/                 # Phase 5: XAI & Reporting
 │   │   ├── generate_gradcam.m
 │   │   ├── temperature_scaling.m
@@ -818,7 +894,7 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 | **Phase 1** | Quality Gate | Mayank & Krrish | `quality_gate.m`, `check_focus.m`, `check_exposure.m`, `check_fov.m`, `recapture_alert.m` | **COMPLETED ✅** |
 | **Phase 2** | Preprocessing & Enhancement | Mayank & Krrish | `enhance_fundus.m`, `crop_fundus_roi.m`, `apply_clahe.m`, `apply_nlm_denoising.m`, `standardize_image.m` | **COMPLETED ✅** |
 | **Phase 3** | Lesion & Vessel Segmentation | Dhruv | `segment_vessels.m`, `locate_optic_disc.m`, `segment_lesions.m`, `unetpp_layers.m`, `train_lesion_segmentor.m` (nested UNet++ DAG) | **COMPLETED ✅** |
-| **Phase 4** | DR Severity Grading | Next Teammate | `build_hybrid_model.m`, `grade_dr_severity.m` (ResNet50 + EfficientNet via `resnet50` / `efficientnetb4`) | **PLANNED ⏳** |
+| **Phase 4** | DR Severity Grading | Aadi | `build_hybrid_model.m`, `train_dr_classifier.m`, `grade_dr_severity.m`, `prepare_grading_dataset.m`, `multiclass_qwk.m` (ResNet-50 + EfficientNet-B0 fallback, two-stage; code done & unit-tested, training pending add-ons/datasets/GPU) | **CODE COMPLETE ✅ / training pending** |
 | **Phase 5** | XAI, GUI & SimEvents | Team | `generate_gradcam.m`, `clinic_flow_simulation.slx`, `NETRA_App.mlapp` | **PLANNED ⏳** |
 
 ---
