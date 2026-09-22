@@ -31,6 +31,19 @@ else
 end
 [cropped, bbox] = crop_fundus_roi(img, margin_pct);
 
+% Optional: cap the working resolution before the expensive CLAHE + NLM steps.
+% Absent by default, so the full-resolution behaviour Phase 3 was trained on is
+% preserved. The Phase 4 grading path opts in (work_max_dim = 2x target_size),
+% because its output is a 512 canvas anyway: enhancing a ~1024 max-edge crop is
+% ~20x faster than at native 12 MP and the 512 result is near-identical
+% (mean abs diff ~0.003 on a 0-1 scale, measured on IDRiD).
+if isfield(cfg.enhancement, 'work_max_dim') && ~isempty(cfg.enhancement.work_max_dim)
+    long_edge = max(size(cropped, 1), size(cropped, 2));
+    if long_edge > cfg.enhancement.work_max_dim
+        cropped = imresize(cropped, cfg.enhancement.work_max_dim / long_edge);
+    end
+end
+
 % Step 2: Estimate Noise
 noise_sigma = estimate_noise(cropped);
 
