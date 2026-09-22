@@ -78,7 +78,7 @@ sev = [0.16 0.63 0.30; 0.62 0.71 0.11; 0.95 0.62 0.07; 0.90 0.38 0.06; 0.80 0.13
 gcol = sev(min(g.grade + 1, 5), :);
 
 % ─── Composite images ────────────────────────────────────────────────────
-lesion_overlay = overlay_legend(local_lesion_overlay(canvas, label_map, classes));
+clinical_overlay = local_clinical_overlay(canvas, r, label_map, classes);
 gradcam_img = local_gradcam_image(canvas, label_map, xai, cfg);
 
 % ─── Figure (portrait, ~A4 proportions) ──────────────────────────────────
@@ -118,8 +118,8 @@ annotation(fig, 'textbox', [0.03 0.878 0.75 0.028], 'String', ...
 annotation(fig, 'line', [0.03 0.97], [0.872 0.872], 'Color', line);
 
 % ── Image panels ──
-local_panel(fig, canvas,         [0.035 0.63 0.44 0.225], 'Enhanced fundus  ·  Phase 2', ink);
-local_panel(fig, lesion_overlay, [0.525 0.63 0.44 0.225], 'Lesion segmentation  ·  Phase 3', ink);
+local_panel(fig, canvas,           [0.035 0.63 0.44 0.225], 'Enhanced fundus  ·  Phase 2', ink);
+local_panel(fig, clinical_overlay, [0.525 0.63 0.44 0.225], 'Clinical overlay  ·  Phase 3', ink);
 gc_title = 'Attention map  ·  Phase 5';
 if isfield(xai, 'gradcam') && isfield(xai.gradcam, 'method') && ...
         xai.gradcam.method == "occlusion-sensitivity"
@@ -148,9 +148,17 @@ annotation(fig, 'textbox', [0.03 0.008 0.94 0.032], 'String', ['— ' char(strin
     'Color', mute, 'FontSize', 9, 'FontAngle', 'italic', 'EdgeColor', 'none', ...
     'VerticalAlignment', 'middle', 'Interpreter', 'none');
 
-% ─── Export ──────────────────────────────────────────────────────────────
+% ─── Export page 1 ───────────────────────────────────────────────────────
 exportgraphics(fig, out_path, 'ContentType', 'vector', 'BackgroundColor', 'white');
 close(fig);
+
+% ─── Page 2: detailed pipeline stages + full metrics (never breaks page 1) ─
+try
+    local_detail_page(out_path, r, g, xai, cfg, options, canvas, gradcam_img, ...
+        clinical_overlay, classes, probs, ink, mute, band, line, card);
+catch ME
+    warning('NETRA:DetailPageSkipped', 'Detail page skipped: %s', ME.message);
+end
 end
 
 % ───────────────────────── layout helpers ───────────────────────────────
@@ -167,6 +175,232 @@ end
 function local_card(fig, pos, fillc, line)
 % A rounded-feel filled card with a hairline border (drawn as a rectangle).
 annotation(fig, 'rectangle', pos, 'FaceColor', fillc, 'Color', line, 'LineWidth', 0.75);
+end
+
+% ═══════════════════════ page 2: detailed breakdown ═════════════════════════
+
+function local_detail_page(out_path, r, g, xai, cfg, options, canvas, gradcam_img, ...
+        clinical_overlay, classes, probs, ink, mute, band, line, card) %#ok<INUSD>
+% A second page appended to the PDF: the pipeline stages as labelled panels, plus
+% full anatomy, image-quality, attention and calibration detail -- the material
+% that does not fit the one-page clinical summary. Mirrors run_walkthrough's
+% stage-by-stage view but for this one patient, inside the report.
+
+fig = figure('Visible', 'off', 'Color', 'w', 'Units', 'pixels', 'Position', [80 80 1000 1400]);
+try, fig.Theme = 'light'; catch, end %#ok<CTCH>
+
+% Header
+annotation(fig, 'rectangle', [0 0.945 1 0.055], 'FaceColor', band, 'LineStyle', 'none');
+annotation(fig, 'textbox', [0.03 0.945 0.94 0.055], 'String', ...
+    'NETRA  ·  Pipeline detail & measurements', 'Color', 'w', 'FontSize', 16, ...
+    'FontWeight', 'bold', 'EdgeColor', 'none', 'VerticalAlignment', 'middle', 'Interpreter', 'none');
+annotation(fig, 'textbox', [0.03 0.905 0.94 0.03], 'String', ...
+    sprintf('Grade %d (%s) — every processing stage from raw capture to attention', ...
+        g.grade, char(string(g.grade_name))), 'Color', mute, 'FontSize', 10, ...
+    'EdgeColor', 'none', 'VerticalAlignment', 'middle', 'Interpreter', 'none');
+
+% ── Pipeline stage panels (2 x 3 grid) ──
+stages = local_stage_panels(canvas, r, gradcam_img, clinical_overlay, options, xai);
+gx = [0.035 0.355 0.675];
+gy = [0.700 0.520];
+k = 0;
+for rr = 1:2
+    for cc = 1:3
+        k = k + 1;
+        if k > numel(stages), break; end
+        local_panel(fig, stages{k}.img, [gx(cc) gy(rr) 0.29 0.155], stages{k}.title, ink);
+    end
+end
+
+% ── Detail cards ──
+local_card(fig, [0.035 0.055 0.44 0.42], card, line);
+local_card(fig, [0.525 0.055 0.44 0.42], card, line);
+local_block(fig, [0.055 0.07 0.40 0.39], local_anatomy_lines(r), ink, mute);
+local_block(fig, [0.545 0.07 0.40 0.39], local_measurement_lines(r, g, xai, classes), ink, mute);
+
+annotation(fig, 'line', [0.03 0.97], [0.043 0.043], 'Color', line);
+annotation(fig, 'textbox', [0.03 0.008 0.94 0.032], 'String', ...
+    ['— ' local_cfg(cfg, {'reporting', 'disclaimer'}, 'Research prototype. Not a medical device.')], ...
+    'Color', mute, 'FontSize', 9, 'FontAngle', 'italic', 'EdgeColor', 'none', ...
+    'VerticalAlignment', 'middle', 'Interpreter', 'none');
+
+exportgraphics(fig, out_path, 'ContentType', 'vector', 'BackgroundColor', 'white', 'Append', true);
+close(fig);
+end
+
+function stages = local_stage_panels(canvas, r, gradcam_img, clinical_overlay, options, xai)
+% Build the ordered list of stage {img, title} panels from data already in hand.
+stages = {};
+label_map = double(r.label_map);
+
+% Raw capture, if the caller passed the original image.
+raw = [];
+if isfield(options, 'RawImage') && ~isempty(options.RawImage)
+    ri = options.RawImage;
+    if ischar(ri) || isstring(ri)
+        try, raw = imread(char(ri)); catch, raw = []; end %#ok<CTCH>
+    else
+        raw = ri;
+    end
+end
+if ~isempty(raw)
+    if size(raw, 3) == 1, raw = repmat(raw, 1, 1, 3); end
+    stages{end+1} = struct('img', im2uint8(imresize(im2double(raw), [size(canvas,1) size(canvas,2)])), ...
+        'title', '1. Raw capture');
+end
+
+stages{end+1} = struct('img', im2uint8(canvas), 'title', '2. Enhanced (Phase 2)');
+
+% Vessels
+vimg = im2double(canvas); if size(vimg,3)==1, vimg = repmat(vimg,1,1,3); end
+if isfield(r, 'vessels') && isstruct(r.vessels) && isfield(r.vessels, 'mask')
+    vimg = local_tint(vimg, r.vessels.mask, [0.0 0.85 0.85], 0.7);
+end
+stages{end+1} = struct('img', im2uint8(vimg), 'title', '3. Retinal vessels');
+
+% Optic disc + fovea
+aimg = im2double(canvas); if size(aimg,3)==1, aimg = repmat(aimg,1,1,3); end
+if isfield(r, 'optic_disc') && isstruct(r.optic_disc) && ~isempty(r.optic_disc)
+    od = r.optic_disc;
+    if isfield(od, 'disc_mask') && any(od.disc_mask(:))
+        aimg = local_tint(aimg, bwperim(imdilate(od.disc_mask, strel('disk', 2))), [0 1 0], 1);
+    end
+    if isfield(od, 'fovea_center') && all(isfinite(od.fovea_center)) && ...
+            isfield(od, 'fovea_radius') && isfinite(od.fovea_radius)
+        [H, W, ~] = size(aimg); [X, Y] = meshgrid(1:W, 1:H);
+        ring = abs(sqrt((X-od.fovea_center(1)).^2 + (Y-od.fovea_center(2)).^2) - od.fovea_radius) < 3;
+        aimg = local_tint(aimg, ring, [1 0 1], 1);
+    end
+end
+stages{end+1} = struct('img', im2uint8(aimg), 'title', '4. Optic disc + fovea');
+
+stages{end+1} = struct('img', clinical_overlay, 'title', '5. Clinical overlay');
+
+% Attention
+atitle = '6. Attention';
+if isfield(xai, 'gradcam') && isfield(xai.gradcam, 'method') && ...
+        xai.gradcam.method == "occlusion-sensitivity"
+    atitle = '6. Occlusion attention';
+end
+stages{end+1} = struct('img', gradcam_img, 'title', atitle); %#ok<*AGROW>
+end
+
+function local_block(fig, pos, entries, ink, mute)
+% Render a titled text block: entries is a struct array with .text, .bold, .col.
+x = pos(1); y = pos(2); w = pos(3); h = pos(4);
+yr = y + h - 0.02; dh = 0.019;
+for i = 1:numel(entries)
+    if strlength(entries(i).text) == 0, yr = yr - dh * 0.5; continue; end
+    wt = 'normal'; if entries(i).bold, wt = 'bold'; end
+    col = ink; if ~entries(i).bold && isfield(entries, 'muted') && entries(i).muted, col = mute; end
+    annotation(fig, 'textbox', [x yr w dh], 'String', char(entries(i).text), 'Color', col, ...
+        'FontSize', 9.5, 'FontWeight', wt, 'EdgeColor', 'none', 'FontName', 'Consolas', ...
+        'VerticalAlignment', 'middle', 'Interpreter', 'none');
+    yr = yr - dh;
+end
+end
+
+function e = local_anatomy_lines(r)
+e = struct('text', {}, 'bold', {}, 'muted', {});
+e = local_e(e, 'Anatomy (Phase 3)', true);
+if isfield(r, 'optic_disc') && isstruct(r.optic_disc) && ~isempty(r.optic_disc)
+    od = r.optic_disc;
+    if isfield(od, 'disc_center')
+        e = local_e(e, sprintf('  Optic disc  [%.0f, %.0f] px', od.disc_center(1), od.disc_center(2)), false);
+    end
+    if isfield(od, 'disc_radius')
+        e = local_e(e, sprintf('  Disc radius  %.0f px', od.disc_radius), false);
+    end
+    if isfield(od, 'confidence')
+        m = ''; if isfield(od, 'method'), m = [' (' char(string(od.method)) ')']; end
+        e = local_e(e, sprintf('  Disc confidence  %.2f%s', od.confidence, m), false);
+    end
+    if isfield(od, 'fovea_center') && all(isfinite(od.fovea_center))
+        side = ''; if isfield(od, 'fovea_side'), side = [' — ' char(string(od.fovea_side)) ' of disc']; end
+        e = local_e(e, sprintf('  Fovea  [%.0f, %.0f]%s', od.fovea_center(1), od.fovea_center(2), side), false);
+    end
+end
+e = local_e(e, '', false);
+e = local_e(e, 'Vasculature', true);
+if isfield(r, 'vessels') && isstruct(r.vessels)
+    if isfield(r.vessels, 'density')
+        e = local_e(e, sprintf('  Vessel density  %.1f%% of FOV', 100 * r.vessels.density), false);
+    end
+    if isfield(r.vessels, 'mean_width')
+        e = local_e(e, sprintf('  Mean calibre  %.1f px', r.vessels.mean_width), false);
+    end
+end
+end
+
+function e = local_measurement_lines(r, g, xai, classes)
+e = struct('text', {}, 'bold', {}, 'muted', {});
+
+% Image quality
+e = local_e(e, 'Image quality (Phase 1)', true);
+q = [];
+if isfield(xai, 'quality') && ~isempty(xai.quality), q = xai.quality; end
+if isstruct(q) && isfield(q, 'metrics')
+    m = q.metrics;
+    cov = local_dig(m, {'fov', 'coverage_ratio'});
+    if ~isnan(cov), e = local_e(e, sprintf('  FOV coverage  %.2f', cov), false); end
+    foc = local_dig(m, {'blur', 'laplacian_variance'});
+    if ~isnan(foc), e = local_e(e, sprintf('  Focus (lap var)  %.1f', foc), false); end
+    br = local_dig(m, {'exposure', 'brightness'});
+    if ~isnan(br), e = local_e(e, sprintf('  Brightness  %.0f/255', br), false); end
+else
+    e = local_e(e, '  passed the quality gate', false);
+end
+e = local_e(e, '', false);
+
+% Grade probabilities
+e = local_e(e, 'Grade probabilities', true);
+p = local_grade_probs(g); nm = ["No DR" "Mild" "Moderate" "Severe" "PDR"];
+for i = 1:min(numel(p), 5)
+    e = local_e(e, sprintf('  %-9s %5.1f%%', nm(i), 100 * p(i)), false);
+end
+e = local_e(e, '', false);
+
+% Attention detail
+if isfield(xai, 'iou') && ~isempty(xai.iou)
+    a = xai.iou;
+    e = local_e(e, 'Attention detail (Phase 5)', true);
+    if isfield(a, 'attention_mass_near_lesion')
+        e = local_e(e, sprintf('  Mass near lesions  %.1f%% (ctrl %.1f%%)', ...
+            100*a.attention_mass_near_lesion, 100*a.control_mass_near), false);
+    end
+    if isfield(a, 'attention_lesion_corr')
+        e = local_e(e, sprintf('  Density correlation  %+.3f', a.attention_lesion_corr), false);
+    end
+    e = local_e(e, sprintf('  Strict pixel IoU  %.3f (ctrl %.3f)', a.iou, a.control_iou), false);
+    if isfield(a, 'tolerance_px')
+        e = local_e(e, sprintf('  Tolerance zone  %d px', a.tolerance_px), false);
+    end
+    e = local_e(e, '', false);
+end
+
+% Calibration
+if isfield(xai, 'calibration') && ~isempty(xai.calibration)
+    c = xai.calibration;
+    e = local_e(e, 'Confidence calibration (Phase 5)', true);
+    e = local_e(e, sprintf('  Temperature T  %.2f', c.T), false);
+    e = local_e(e, sprintf('  ECE  %.3f -> %.3f', c.ece_before, c.ece_after), false);
+    if isfield(c, 'num_samples')
+        e = local_e(e, sprintf('  fitted on %d held-out images', c.num_samples), false);
+    end
+end
+end
+
+function e = local_e(e, text, bold)
+e(end+1) = struct('text', string(text), 'bold', bold, 'muted', ~bold); %#ok<AGROW>
+end
+
+function v = local_dig(s, path)
+% Nested field access returning NaN when any level is missing.
+v = s;
+for i = 1:numel(path)
+    if isstruct(v) && isfield(v, path{i}), v = v.(path{i}); else, v = NaN; return; end
+end
+if ~isnumeric(v) || isempty(v), v = NaN; else, v = double(v(1)); end
 end
 
 function local_prob_bar(ax, probs, sev, ink, mute, line)
@@ -319,14 +553,68 @@ if size(overlay, 3) == 1, overlay = repmat(overlay, 1, 1, 3); end
 for c = classes.lesion_ids
     mask = label_map == c;
     if ~any(mask(:)), continue; end
-    color = classes.colors(c, :);
-    for ch = 1:3
-        chan = overlay(:, :, ch);
-        chan(mask) = 0.5 * chan(mask) + 0.5 * color(ch);
-        overlay(:, :, ch) = chan;
-    end
+    overlay = local_tint(overlay, mask, classes.colors(c, :), 0.5);
 end
 overlay = im2uint8(overlay);
+end
+
+function img = local_clinical_overlay(canvas, r, label_map, classes)
+% The full Phase 3 clinical picture on one image: retinal vessels, the four
+% lesion classes, the optic disc boundary and the fovea -- the same composite
+% run_walkthrough calls the "clinical overlay", with a colour key beneath.
+img = im2double(canvas);
+if size(img, 3) == 1, img = repmat(img, 1, 1, 3); end
+
+% Vessels first (faint cyan), only where there is no lesion, so lesions stay clear.
+if isfield(r, 'vessels') && isstruct(r.vessels) && isfield(r.vessels, 'mask') ...
+        && ~isempty(r.vessels.mask)
+    vmask = r.vessels.mask & (label_map <= 1);
+    img = local_tint(img, vmask, [0.0 0.6 0.6], 0.45);
+end
+
+% Lesions (solid class colours).
+for c = classes.lesion_ids
+    img = local_tint(img, label_map == c, classes.colors(c, :), 0.55);
+end
+
+% Optic disc boundary (green) and fovea ring (magenta).
+anat_items = struct('color', {}, 'label', {});
+if isfield(r, 'optic_disc') && isstruct(r.optic_disc) && ~isempty(r.optic_disc)
+    od = r.optic_disc;
+    if isfield(od, 'disc_mask') && any(od.disc_mask(:))
+        perim = bwperim(imdilate(od.disc_mask, strel('disk', 2)));
+        img = local_tint(img, perim, [0.0 1.0 0.0], 1.0);
+        anat_items(end+1) = struct('color', [0 255 0], 'label', 'optic disc'); %#ok<AGROW>
+    end
+    if isfield(od, 'fovea_center') && all(isfinite(od.fovea_center)) && ...
+            isfield(od, 'fovea_radius') && isfinite(od.fovea_radius)
+        [H, W, ~] = size(img);
+        [X, Y] = meshgrid(1:W, 1:H);
+        ring = abs(sqrt((X - od.fovea_center(1)).^2 + (Y - od.fovea_center(2)).^2) - od.fovea_radius) < 3;
+        img = local_tint(img, ring, [1.0 0.0 1.0], 1.0);
+        anat_items(end+1) = struct('color', [255 0 255], 'label', 'fovea'); %#ok<AGROW>
+    end
+end
+if isfield(r, 'vessels') && isstruct(r.vessels) && isfield(r.vessels, 'mask')
+    anat_items(end+1) = struct('color', [0 153 153], 'label', 'vessels'); %#ok<AGROW>
+end
+
+img = im2uint8(img);
+if isempty(anat_items)
+    img = overlay_legend(img);
+else
+    img = overlay_legend(img, anat_items);
+end
+end
+
+function img = local_tint(img, mask, color, alpha)
+% Alpha-blend a solid colour into the masked pixels of an RGB double image.
+if ~any(mask(:)), return; end
+for ch = 1:3
+    chan = img(:, :, ch);
+    chan(mask) = (1 - alpha) * chan(mask) + alpha * color(ch);
+    img(:, :, ch) = chan;
+end
 end
 
 function img = local_gradcam_image(canvas, label_map, xai, cfg)

@@ -116,7 +116,7 @@ out_dir = fullfile(root, 'data', 'processed', 'reports');
 [~, name] = fileparts(image_path);
 out_pdf = fullfile(out_dir, ['report_' name '.pdf']);
 xai = struct('gradcam', gc, 'iou', iou, 'calibration', cal, 'quality', local_quality(g));
-ropts = struct('ImageName', [name '.png'], 'Confidence', disp_conf);
+ropts = struct('ImageName', [name '.png'], 'Confidence', disp_conf, 'RawImage', image_path);
 if isempty(gc)
     % No Grad-CAM result to carry the canvas; enhance once for the report.
     ropts.Canvas = local_enhance_canvas(image_path, cfg);

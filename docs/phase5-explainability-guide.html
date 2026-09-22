@@ -606,6 +606,12 @@ panel "Occlusion sensitivity" instead of "Grad-CAM". A flat network (like the de
 <table>
 <thead><tr><th>Date</th><th>Change</th></tr></thead>
 <tbody>
+<tr><td>2026-09-22</td><td><b>Richer two-page report.</b> Page 1's segmentation panel is now a full
+<em>clinical overlay</em> (lesions + vessels + optic-disc boundary + fovea, with a colour key), matching
+run_walkthrough's composite. Added a <em>page 2</em>: the pipeline stages as labelled panels (raw → enhanced →
+vessels → disc/fovea → clinical overlay → attention) plus full anatomy (disc centre/radius/confidence, fovea,
+vessel density/calibre), image-quality metrics, grade probabilities, attention detail and calibration. Page 2 is
+wrapped so it can never break the one-page summary.</td></tr>
 <tr><td>2026-09-22</td><td><b>Occlusion works + resolution-fair metrics.</b> Forced occlusion on the nested
 hybrid (gradCAM was silently returning a uniform map). The occlusion map now localises clearly on the diseased
 macular region (sample image, Severe NPDR). Added fair alignment measures to <code>attention_lesion_iou</code>:
