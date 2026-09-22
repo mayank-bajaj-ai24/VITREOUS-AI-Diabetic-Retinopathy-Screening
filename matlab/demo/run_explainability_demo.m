@@ -85,8 +85,10 @@ iou = [];
 if ~isempty(gc)
     fprintf('[4/6] Attention-lesion IoU...\n');
     iou = attention_lesion_iou(gc, r, cfg);
-    fprintf('       attention mass on lesions %.1f%%, IoU %.3f vs control %.3f (lift %+.3f)\n', ...
-        100 * iou.attention_mass_on_lesion, iou.iou, iou.control_iou, iou.lift);
+    fprintf('       near-lesion mass %.1f%% vs control %.1f%% (lift %+.1f pts), corr %+.3f\n', ...
+        100 * iou.attention_mass_near_lesion, 100 * iou.control_mass_near, ...
+        100 * iou.mass_lift, iou.attention_lesion_corr);
+    fprintf('       [strict pixel IoU %.3f vs control %.3f]\n', iou.iou, iou.control_iou);
 else
     fprintf('[4/6] Attention-lesion IoU SKIPPED (no Grad-CAM).\n');
 end

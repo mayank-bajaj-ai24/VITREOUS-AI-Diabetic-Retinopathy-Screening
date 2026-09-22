@@ -263,15 +263,25 @@ end
 % Attention–lesion alignment
 if isfield(xai, 'iou') && ~isempty(xai.iou)
     a = xai.iou;
-    [lines, bold, cols] = local_push(lines, bold, cols, 'Attention vs lesions (Grad-CAM):', true, ink);
-    [lines, bold, cols] = local_push(lines, bold, cols, ...
-        sprintf('   mass on lesions   %.1f%%', 100 * a.attention_mass_on_lesion), false, ink);
-    [lines, bold, cols] = local_push(lines, bold, cols, ...
-        sprintf('   IoU %.3f   vs control %.3f', a.iou, a.control_iou), false, ink);
-    verdict = 'aligned with disease'; vcol = [0.16 0.63 0.30];
-    if a.lift <= 0, verdict = 'not aligned (lift <= 0)'; vcol = [0.80 0.13 0.13]; end
-    [lines, bold, cols] = local_push(lines, bold, cols, ...
-        sprintf('   lift %+.3f  — %s', a.lift, verdict), false, vcol);
+    [lines, bold, cols] = local_push(lines, bold, cols, 'Attention vs lesions:', true, ink);
+    if isfield(a, 'attention_mass_near_lesion')
+        [lines, bold, cols] = local_push(lines, bold, cols, ...
+            sprintf('   mass near lesions  %.1f%%  (control %.1f%%)', ...
+                100 * a.attention_mass_near_lesion, 100 * a.control_mass_near), false, ink);
+    end
+    if isfield(a, 'attention_lesion_corr')
+        [lines, bold, cols] = local_push(lines, bold, cols, ...
+            sprintf('   density correlation  %+.3f', a.attention_lesion_corr), false, ink);
+    end
+    % Verdict from the resolution-fair measure (near-lesion mass lift) if present,
+    % else the strict IoU lift.
+    if isfield(a, 'mass_lift'), score = a.mass_lift; else, score = a.lift; end
+    if score > 0
+        verdict = 'attention concentrates on disease'; vcol = [0.16 0.63 0.30];
+    else
+        verdict = 'no alignment above chance'; vcol = [0.80 0.13 0.13];
+    end
+    [lines, bold, cols] = local_push(lines, bold, cols, ['   ' verdict], false, vcol);
     [lines, bold, cols] = local_push(lines, bold, cols, '', false, ink);
 end
 

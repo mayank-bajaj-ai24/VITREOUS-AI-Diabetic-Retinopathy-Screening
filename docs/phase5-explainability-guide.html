@@ -606,6 +606,12 @@ panel "Occlusion sensitivity" instead of "Grad-CAM". A flat network (like the de
 <table>
 <thead><tr><th>Date</th><th>Change</th></tr></thead>
 <tbody>
+<tr><td>2026-09-22</td><td><b>Occlusion works + resolution-fair metrics.</b> Forced occlusion on the nested
+hybrid (gradCAM was silently returning a uniform map). The occlusion map now localises clearly on the diseased
+macular region (sample image, Severe NPDR). Added fair alignment measures to <code>attention_lesion_iou</code>:
+<em>attention mass near lesions</em> (within a tolerance zone, since a coarse map cannot tile a 4-px lesion) with a
+control baseline, and an <em>attention–lesion-density correlation</em>. The report verdict now reads from the
+near-lesion mass lift. Strict pixel IoU is still reported but no longer the headline.</td></tr>
 <tr><td>2026-09-22</td><td><b>Real model runs; Grad-CAM fallback added.</b> The 111 MB trained model was pushed
 (Git LFS) and the demo now grades for real (sample image → Severe NPDR, 76.7%). Confirmed the open item:
 <code>gradCAM</code> <em>cannot</em> address a convolution nested inside a <code>networkLayer</code> ("Layer does
