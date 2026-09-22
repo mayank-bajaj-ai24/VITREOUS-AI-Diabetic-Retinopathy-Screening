@@ -149,7 +149,10 @@ annotation(fig, 'textbox', [0.03 0.008 0.94 0.032], 'String', ['— ' char(strin
     'VerticalAlignment', 'middle', 'Interpreter', 'none');
 
 % ─── Export page 1 ───────────────────────────────────────────────────────
-exportgraphics(fig, out_path, 'ContentType', 'vector', 'BackgroundColor', 'white');
+% Raster, not vector: the page is mostly fundus photographs, so vectorising it
+% is pointless and makes exportgraphics extremely slow (it can appear to hang).
+exportgraphics(fig, out_path, 'ContentType', 'image', 'Resolution', 200, ...
+    'BackgroundColor', 'white');
 close(fig);
 
 % ─── Page 2: detailed pipeline stages + full metrics (never breaks page 1) ─
@@ -224,7 +227,8 @@ annotation(fig, 'textbox', [0.03 0.008 0.94 0.032], 'String', ...
     'Color', mute, 'FontSize', 9, 'FontAngle', 'italic', 'EdgeColor', 'none', ...
     'VerticalAlignment', 'middle', 'Interpreter', 'none');
 
-exportgraphics(fig, out_path, 'ContentType', 'vector', 'BackgroundColor', 'white', 'Append', true);
+exportgraphics(fig, out_path, 'ContentType', 'image', 'Resolution', 200, ...
+    'BackgroundColor', 'white', 'Append', true);
 close(fig);
 end
 
