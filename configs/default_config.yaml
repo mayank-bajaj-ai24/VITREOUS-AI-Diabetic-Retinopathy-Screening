@@ -43,6 +43,10 @@ enhancement:
   normalization_mode: "float01"       # "float01" (0.0–1.0) or "uint8" (0–255)
   clahe_mode: "green"                 # "green" (vascular contrast) or "lab" (color-preserving)
   crop_margin_pct: 0.02               # Safety margin around ROI bounding box (fraction)
+  grading_input_max_dim: 640          # Phase 4 only: bound the raw long edge before quality gate
+                                      # + enhancement (prep speed). Read by prepare_grading_dataset
+                                      # and grade_dr_severity so training == inference. Not used by
+                                      # the Phase 3 / segmentation path.
 
   # Quality-Adaptive Profiles
   profiles:
@@ -64,6 +68,13 @@ enhancement:
       clahe_clip_limit: 4.0
       clahe_tile_grid: 8
       nlm_filter_strength: 12
+      nlm_template_window: 7
+      nlm_search_window: 21
+
+    borderline:                       # Worst images that still passed the gate (composite < 0.35) — maximal enhancement
+      clahe_clip_limit: 5.0
+      clahe_tile_grid: 8
+      nlm_filter_strength: 15
       nlm_template_window: 7
       nlm_search_window: 21
 

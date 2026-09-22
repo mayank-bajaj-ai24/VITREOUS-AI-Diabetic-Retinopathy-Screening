@@ -4,7 +4,7 @@ function run_walkthrough(image_path)
 %   run_walkthrough()                  % uses the first sample image
 %   run_walkthrough('path/to/img.jpg') % any fundus image
 %
-%   Renders every stage of the Phase 1 -> Phase 2 -> Phase 3 pipeline as a
+%   Renders every stage of the Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 pipeline as a
 %   labelled panel and writes both the individual stages and a single contact
 %   sheet, so the whole journey from raw capture to clinical overlay can be
 %   inspected or shown in one image.
@@ -199,6 +199,25 @@ else
     fprintf('               run run_training first\n');
 end
 
+% ═══ STAGE 4: DR severity grading (Phase 4) ══════════════════════════════
+fprintf('STAGE 4  DR Severity Grading (Phase 4)\n');
+models_dir = fullfile(proj_root, 'data', 'processed', 'models');
+gcands = {fullfile(models_dir, 'dr_grading_hires.mat'), fullfile(models_dir, 'dr_grading.mat')};
+gmodel = '';
+for gi = 1:numel(gcands)
+    if isfile(gcands{gi}), gmodel = gcands{gi}; break; end
+end
+if ~isempty(gmodel)
+    gr = grade_dr_severity(image_path, gmodel, cfg);
+    fprintf('  GRADE %d (%s), confidence %.0f%%, referable=%d\n', ...
+        gr.grade, gr.grade_name, 100 * gr.confidence, gr.referable);
+    panels{end+1} = grade_panel(gr, canvas_size);
+    titles{end+1} = sprintf('5. DR Grade %d (%s)', gr.grade, gr.grade_name);
+    draw_live(fig, panels, titles);
+else
+    fprintf('  no grading model found; run run_dr_training / run_dr_finetune first\n');
+end
+
 % ═══ Write out ═══════════════════════════════════════════════════════════
 fprintf('\nWriting %d stages to %s\n', numel(panels), out_dir);
 for i = 1:numel(panels)
@@ -225,7 +244,7 @@ n = numel(panels);
 cols = min(5, max(n, 1));
 rows = ceil(n / cols);
 t = tiledlayout(fig, rows, cols, 'TileSpacing', 'compact', 'Padding', 'compact');
-t.Title.String = 'NETRA: Phase 1 -> Phase 2 -> Phase 3';
+t.Title.String = 'NETRA: Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 (grade)';
 t.Title.Color = 'w';
 t.Title.FontWeight = 'bold';
 for i = 1:n
@@ -234,6 +253,38 @@ for i = 1:n
     title(ax, titles{i}, 'Color', 'w', 'FontSize', 9, 'Interpreter', 'none');
 end
 drawnow;
+end
+
+
+function img = grade_panel(gr, sz)
+% GRADE_PANEL  Render the Phase 4 grade + class probabilities as an sz x sz
+%   image tile, so it drops into the walkthrough montage like any other stage.
+%   Uses a hidden figure + exportgraphics (no insertText / Computer Vision
+%   Toolbox dependency).
+f = figure('Visible', 'off', 'Color', 'w', 'Units', 'pixels', ...
+    'Position', [0 0 sz sz]);
+tl = tiledlayout(f, 3, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+nexttile(tl); axis off;
+if gr.referable, refstr = 'REFERABLE -> refer'; rc = [0.75 0 0];
+else,            refstr = 'not referable -> rescreen'; rc = [0 0.5 0]; end
+text(0.03, 0.80, sprintf('DR GRADE %d', gr.grade), 'FontSize', 22, 'FontWeight', 'bold');
+text(0.03, 0.45, gr.grade_name, 'FontSize', 13);
+text(0.03, 0.15, refstr, 'FontSize', 13, 'FontWeight', 'bold', 'Color', rc);
+
+nexttile(tl, [2 1]);
+b = bar(0:4, gr.probabilities, 'FaceColor', 'flat');
+b.CData = repmat([0.3 0.55 0.85], 5, 1);
+b.CData(gr.grade + 1, :) = [0.85 0.4 0.2];
+set(gca, 'XTick', 0:4, 'XTickLabel', {'G0', 'G1', 'G2', 'G3', 'G4'});
+ylim([0 1]); ylabel('probability'); grid on;
+title(sprintf('ICDR probabilities (conf %.0f%%)', 100 * gr.confidence));
+
+tmp = [tempname '.png'];
+exportgraphics(f, tmp, 'Resolution', 100);
+close(f);
+img = imresize(imread(tmp), [sz sz]);
+delete(tmp);
 end
 
 
@@ -279,8 +330,11 @@ sheet = zeros(rows*(cell_sz+band), cols*cell_sz, 3, 'uint8');
 for i = 1:n
     r = floor((i-1)/cols); c = mod(i-1, cols);
     tile = imresize(panels{i}, [cell_sz cell_sz]);
-    label = insertText(zeros(band, cell_sz, 3, 'uint8'), [3 3], titles{i}, ...
-        'FontSize', 11, 'BoxOpacity', 0, 'TextColor', 'white');
+    label = zeros(band, cell_sz, 3, 'uint8');
+    if exist('insertText', 'file')     % needs Computer Vision Toolbox
+        label = insertText(label, [3 3], titles{i}, ...
+            'FontSize', 11, 'BoxOpacity', 0, 'TextColor', 'white');
+    end
     y = r*(cell_sz+band) + 1;
     x = c*cell_sz + 1;
     sheet(y:y+band-1, x:x+cell_sz-1, :) = label;
