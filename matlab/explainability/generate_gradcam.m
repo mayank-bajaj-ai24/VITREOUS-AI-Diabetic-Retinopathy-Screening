@@ -204,19 +204,38 @@ end
 
 function name = local_last_conv_layer(net)
 % Name of the last 2-D convolution layer in the graph -- the usual Grad-CAM
-% target. Falls back to grouped convolutions if a network uses them.
-layers = net.Layers;
-name = '';
-for i = 1:numel(layers)
-    if isa(layers(i), 'nnet.cnn.layer.Convolution2DLayer') || ...
-       isa(layers(i), 'nnet.cnn.layer.GroupedConvolution2DLayer')
-        name = layers(i).Name;
-    end
-end
+% target. Recurses into nested networkLayer branches, because the Phase 4 hybrid
+% wraps each backbone (resnet, effnet) in a networkLayer, so its conv layers do
+% not appear at the top level. Returns a hierarchical "branch/layer" name in
+% that case. Falls back to grouped convolutions.
+name = local_scan_conv(net.Layers, '');
 if isempty(name)
     error('NETRA:NoConvLayer', ...
         'No convolution layer found to use as the Grad-CAM feature layer.');
 end
+end
+
+function name = local_scan_conv(layers, prefix)
+name = '';
+for i = 1:numel(layers)
+    L = layers(i);
+    if isa(L, 'nnet.cnn.layer.Convolution2DLayer') || ...
+       isa(L, 'nnet.cnn.layer.GroupedConvolution2DLayer')
+        name = local_join(prefix, L.Name);
+    elseif isprop(L, 'Network') && isa(L.Network, 'dlnetwork')
+        % Nested network (a hybrid branch): search inside and keep its name if it
+        % holds a convolution deeper in the graph than anything at this level.
+        try
+            inner = local_scan_conv(L.Network.Layers, local_join(prefix, L.Name));
+            if ~isempty(inner), name = inner; end
+        catch
+        end
+    end
+end
+end
+
+function s = local_join(prefix, name)
+if isempty(prefix), s = name; else, s = [prefix '/' name]; end
 end
 
 function m = local_normalise01(m)

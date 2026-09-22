@@ -551,22 +551,34 @@ here because exact numbers depend on random weights.</p>
 </table>
 
 <!-- ============ interface ============ -->
-<h2 id="interface">The Phase 4 interface (what my code assumes)</h2>
-<p>Full detail in <code>docs/phase5-interface.md</code>. The essentials Phase 5 needs from Phase 4's
-<code>grade_dr_severity</code>:</p>
+<h2 id="interface">The Phase 4 interface (as delivered)</h2>
+<p>Phase 4 shipped. The delivered <code>grade_dr_severity</code> differs from the contract Phase 5 was drafted
+against; full detail in <code>docs/phase5-interface.md</code>. What it actually returns, and how Phase 5 adapts:</p>
 <table>
-<thead><tr><th>Field</th><th>Type</th><th>Used by</th></tr></thead>
+<thead><tr><th>Drafted contract</th><th>Reality</th><th>Phase 5 adaptation</th></tr></thead>
 <tbody>
-<tr><td><code>g.grade</code></td><td>int 0–4</td><td>report</td></tr>
-<tr><td><code>g.probs</code></td><td>1×5</td><td>report, calibration</td></tr>
-<tr><td><code>g.logits</code> <b>(critical)</b></td><td>1×5 pre-softmax</td><td>temperature scaling — impossible without it</td></tr>
-<tr><td><code>g.confidence</code></td><td>scalar</td><td>report</td></tr>
-<tr><td><code>g.canvas</code></td><td>512×512×3</td><td>Grad-CAM, IoU (shared coordinate frame)</td></tr>
-<tr><td><code>g.gradcam_layer</code></td><td>string</td><td>Grad-CAM (which conv layer / branch)</td></tr>
+<tr><td><code>g.probs</code></td><td><code>g.probabilities</code></td><td>report accepts either (<code>local_grade_probs</code>)</td></tr>
+<tr><td><code>g.logits</code> returned</td><td>not returned; net ends in softmax</td><td>recover as <code>log(probabilities)</code> — equal to logits up to a constant softmax cancels (<code>collect_grading_logits</code>)</td></tr>
+<tr><td><code>g.canvas</code> returned</td><td>not returned</td><td>report pulls it from <code>xai.gradcam.canvas</code> or <code>options.Canvas</code></td></tr>
+<tr><td><code>g.gradcam_layer</code></td><td>not returned</td><td>auto-detect recurses into nested backbones + warns, or set <code>explainability.feature_layer</code></td></tr>
+<tr><td>— </td><td>adds <code>options.Temperature</code></td><td>the inference hook our calibration feeds its fitted T into</td></tr>
 </tbody>
 </table>
-<p>Plus, for calibration, a held-out <code>logits</code> (N×5) + <code>labels</code> (N) the model never trained on,
-saved to <code>data/processed/grading/heldout_calibration.mat</code>.</p>
+
+<div class="why"><b>The log-probability trick.</b> Their network ends in softmax, so it never exposes raw logits.
+But for a softmax, <code>log(p_i) = z_i − logsumexp(z)</code> — the log-probabilities equal the true logits
+<code>z</code> up to a per-sample constant. That constant cancels inside softmax, so temperature scaling fitted on
+<code>log(p)</code> recovers <em>exactly</em> the same T and the same calibrated probabilities as fitting on
+<code>z</code>. So no change to Phase 4 is needed — <code>collect_grading_logits</code> just takes
+<code>log(probabilities)</code> over the held-out split.</div>
+
+<h3>Grad-CAM on the nested hybrid — the open item</h3>
+<p>The grading model wraps each backbone in a <code>networkLayer</code> (<code>resnet</code>, <code>effnet</code>),
+so its conv layers are nested, not on the top-level graph. <code>generate_gradcam</code> now recurses into those
+branches and returns a hierarchical <code>branch/layer</code> name. This is <b>untested on the real model</b>,
+because the trained <code>.mat</code> is not in the repo — it lives on the training machine. To validate it we need
+Aadi to push <code>dr_grading_hires.mat</code>. Until then the demo falls back to the stub, so the pipeline still
+runs, and Grad-CAM/IoU are exercised on the stub while calibration and the report run on whatever grade is produced.</p>
 
 <!-- ============ caveats ============ -->
 <h2 id="caveats">Honest caveats (so you can defend the work)</h2>
@@ -588,6 +600,15 @@ saved to <code>data/processed/grading/heldout_calibration.mat</code>.</p>
 <table>
 <thead><tr><th>Date</th><th>Change</th></tr></thead>
 <tbody>
+<tr><td>2026-09-22</td><td><b>Phase 4 integration.</b> Aadi's real grading model (dual-branch ResNet-50 +
+EfficientNet-b0, held-out IDRiD QWK 0.76) merged from <code>main</code> into <code>Kathan</code>. Rewired Phase 5
+to the delivered <code>grade_dr_severity</code> interface, which differs from the drafted contract: it returns
+<code>.probabilities</code> (not <code>.probs</code>), no logits and no canvas. Adaptations: the report accepts
+either probability field and pulls the canvas from the Grad-CAM result; a new <code>collect_grading_logits.m</code>
+recovers logits as <code>log(probabilities)</code> for temperature scaling (equal to true logits up to a constant
+softmax cancels); <code>generate_gradcam</code> now recurses into the hybrid's nested <code>networkLayer</code>
+backbones to find a feature layer; the demo uses the trained model when present and the stub otherwise.
+<b>Open item:</b> Grad-CAM on the nested hybrid is untested — the trained <code>.mat</code> is not in the repo.</td></tr>
 <tr><td>2026-09-14</td><td><b>Report redesign.</b> The first PDF looked washed-out (inherited the host's
 dark UI theme → faint text and a black-backed chart). Rebuilt <code>generate_pdf_report.m</code> with manual layout:
 a teal header band, a severity-coloured grade badge, a referable strip, forced light theme, high-contrast text,

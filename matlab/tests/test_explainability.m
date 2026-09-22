@@ -129,6 +129,44 @@ info = dir(p);
 verifyGreaterThan(testCase, info.bytes, 0);
 end
 
+function testReportAcceptsPhase4GradeStruct(testCase)
+% grade_dr_severity returns .probabilities (not .probs) and no .canvas. The
+% report must take probabilities and pull the canvas from the Grad-CAM result.
+[att, r] = local_aligned_fixture();
+g = struct('grade', 2, 'grade_name', "Moderate NPDR", ...
+    'probabilities', [0.05 0.10 0.60 0.20 0.05], 'confidence', 0.60, ...
+    'referable', true, 'mode', 'end-to-end');
+gc = struct('score_map_canvas', att, 'canvas', repmat(0.4, 512, 512, 3), ...
+    'feature_layer', "effnet/conv_last");
+xai = struct('gradcam', gc, 'iou', attention_lesion_iou(att, r, testCase.TestData.cfg));
+out = fullfile(tempdir, ['netra_report_' char(matlab.lang.internal.uuid()) '.pdf']);
+cleanup = onCleanup(@() local_delete(out)); %#ok<NASGU>
+p = generate_pdf_report(out, r, g, xai, testCase.TestData.cfg, struct('ImageName', 'p4.png'));
+verifyTrue(testCase, isfile(p));
+end
+
+% ─── Calibration bridge to Phase 4 (needs Deep Learning Toolbox) ──────────
+
+function testCollectGradingLogitsWithStub(testCase)
+% collect_grading_logits drives grade_dr_severity; a bare stub dlnetwork is a
+% valid end-to-end model for it, so this also checks Phase 4 inference runs.
+local_assume_dlt(testCase);
+cfg = testCase.TestData.cfg;
+root = testCase.TestData.proj_root;
+samples = dir(fullfile(root, 'data', 'sample_images', '*.png'));
+assumeTrue(testCase, numel(samples) >= 2, 'need >= 2 sample images');
+net = make_stub_grading_net(cfg);
+imgs = {fullfile(samples(1).folder, samples(1).name), ...
+        fullfile(samples(2).folder, samples(2).name)};
+[lg, lb] = collect_grading_logits(imgs, [0; 2], net, cfg, struct('Verbose', false));
+verifyEqual(testCase, size(lg, 2), 5);
+verifyEqual(testCase, size(lg, 1), numel(lb));
+verifyLessThanOrEqual(testCase, size(lg, 1), 2);
+% Fitting temperature on these must run and preserve accuracy invariance.
+cal = temperature_scaling(lg, lb, cfg);
+verifyGreaterThan(testCase, cal.T, 0);
+end
+
 % ─── Grad-CAM + stub (need Deep Learning Toolbox) ─────────────────────────
 
 function testStubGradeContract(testCase)

@@ -63,7 +63,8 @@ if ~isempty(out_dir) && ~isfolder(out_dir), mkdir(out_dir); end
 out_path = fullfile(out_dir, [base ext]);
 
 classes   = lesion_classes();
-canvas    = im2double(g.canvas);
+probs     = local_grade_probs(g);                    % accepts .probabilities or .probs
+canvas    = local_report_canvas(g, xai, options);    % grade result carries no canvas
 label_map = double(r.label_map);
 
 % ─── Palette ─────────────────────────────────────────────────────────────
@@ -127,7 +128,7 @@ local_panel(fig, gradcam_img,    [0.035 0.375 0.44 0.225], gc_title, ink);
 
 % ── Probability chart ──
 axP = axes(fig, 'Units', 'normalized', 'Position', [0.585 0.415 0.36 0.165]); %#ok<LAXES>
-local_prob_bar(axP, g.probs, sev, ink, mute, line);
+local_prob_bar(axP, probs, sev, ink, mute, line);
 annotation(fig, 'textbox', [0.525 0.585 0.44 0.03], 'String', 'Grade probabilities', ...
     'Color', ink, 'FontSize', 11, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
     'VerticalAlignment', 'middle', 'Interpreter', 'none');
@@ -386,6 +387,38 @@ end
 
 function v = local_opt(options, field, default)
 if isfield(options, field) && ~isempty(options.(field)), v = options.(field); else, v = default; end
+end
+
+function probs = local_grade_probs(g)
+% Phase 4's grade_dr_severity returns .probabilities; the development stub and
+% earlier drafts used .probs. Accept either so the report works with both.
+if isfield(g, 'probabilities') && ~isempty(g.probabilities)
+    probs = g.probabilities;
+elseif isfield(g, 'probs') && ~isempty(g.probs)
+    probs = g.probs;
+else
+    error('NETRA:NoProbabilities', ...
+        'Grade result has neither .probabilities nor .probs.');
+end
+probs = double(probs(:))';
+end
+
+function canvas = local_report_canvas(g, xai, options)
+% grade_dr_severity does not return the enhanced canvas, so resolve it from the
+% grade result if present (stub), else from the Grad-CAM result (generate_gradcam
+% returns .canvas), else from options.Canvas. All three are the same 512 frame.
+if isfield(g, 'canvas') && ~isempty(g.canvas)
+    canvas = g.canvas;
+elseif isfield(xai, 'gradcam') && isfield(xai.gradcam, 'canvas') && ~isempty(xai.gradcam.canvas)
+    canvas = xai.gradcam.canvas;
+elseif isfield(options, 'Canvas') && ~isempty(options.Canvas)
+    canvas = options.Canvas;
+else
+    error('NETRA:NoCanvas', ...
+        ['No enhanced canvas available. grade_dr_severity does not return one; ' ...
+         'pass the Grad-CAM result in xai.gradcam (it carries .canvas) or set options.Canvas.']);
+end
+canvas = im2double(canvas);
 end
 
 function v = local_cfg(cfg, path, default)
