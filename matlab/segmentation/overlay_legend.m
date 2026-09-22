@@ -69,9 +69,14 @@ for i = 1:numel(items)
         strip(y:y+swatch-1, x:x+swatch-1, ch) = block;
     end
 
-    strip = insertText(strip, [x + swatch + round(pad*0.8), y - 2], ...
-        items(i).label, 'FontSize', max(9, round(row_h * 0.55)), ...
-        'BoxOpacity', 0, 'TextColor', 'white');
+    % insertText needs the Computer Vision Toolbox. Where it is unavailable,
+    % keep the colour swatches (still a usable legend) and skip the text label
+    % rather than failing the whole overlay.
+    if exist('insertText', 'file')
+        strip = insertText(strip, [x + swatch + round(pad*0.8), y - 2], ...
+            items(i).label, 'FontSize', max(9, round(row_h * 0.55)), ...
+            'BoxOpacity', 0, 'TextColor', 'white');
+    end
 end
 
 out = [img; strip];
