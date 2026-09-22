@@ -160,10 +160,25 @@ datasets:
   eyepacs: "data/datasets/eyepacs/"
   messidor2: "data/datasets/messidor2/"
 
-# ─── Calibration (Phase 3 — XAI) ───
+# ─── Calibration (Phase 5 — XAI) ───
 calibration:
   initial_temperature: 1.5            # Temperature scaling starting point
   max_iterations: 100                 # Optimization iterations
+  temperature_bounds: [0.05, 10.0]    # Search range for the scalar T (fminbnd)
+  ece_bins: 15                        # Reliability-diagram bins for ECE
+
+# ─── Explainability (Phase 5 — XAI) ───
+explainability:
+  feature_layer: ""                   # Grad-CAM conv layer; "" => auto-detect + warn
+  reduction_layer: "softmax"          # Output layer Grad-CAM reduces over
+  attention_percentile: 90            # Grad-CAM "hot" threshold for IoU (top 10%)
+  overlay_alpha: 0.45                 # Heatmap blend weight over the fundus
+
+# ─── Reporting (Phase 5 — Clinical PDF) ───
+reporting:
+  output_dir: "data/processed/reports/"
+  colormap: "jet"                     # Grad-CAM heatmap colormap
+  disclaimer: "Research prototype. Not a medical device. For screening triage support only."
 
 # ─── Target Metrics ───
 targets:
