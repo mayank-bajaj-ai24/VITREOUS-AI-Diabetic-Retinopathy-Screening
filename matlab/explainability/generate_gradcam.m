@@ -105,22 +105,38 @@ end
 explicit = char(feat_layer);
 method = "grad-cam";
 used_layer = string(explicit);
-try
-    if ~isempty(explicit)
-        % Caller/config named a top-level conv layer: the reliable dlnetwork call.
-        score_map = gradCAM(net, X, class_idx, ...
-            'FeatureLayer', explicit, 'ReductionLayer', red_layer);
-    else
-        % No layer named: let gradCAM pick its own. If it cannot (nested hybrid),
-        % the error is caught below and occlusion takes over.
-        score_map = gradCAM(net, X, class_idx, 'ReductionLayer', red_layer);
-        used_layer = "auto";
+use_occlusion = false;
+
+% The Phase 4 hybrid wraps each backbone in a networkLayer. gradCAM cannot
+% address a convolution nested inside one, AND its own auto-selection does not
+% error -- it silently returns a near-uniform, useless map. So when no layer is
+% named and the network has nested branches, skip gradCAM entirely and use the
+% faithful occlusion method. gradCAM is used only when a caller/config names an
+% addressable top-level conv layer (e.g. the flat dev stub).
+if isempty(explicit) && local_has_nested(net)
+    use_occlusion = true;
+else
+    try
+        if ~isempty(explicit)
+            score_map = gradCAM(net, X, class_idx, ...
+                'FeatureLayer', explicit, 'ReductionLayer', red_layer);
+        else
+            score_map = gradCAM(net, X, class_idx, 'ReductionLayer', red_layer);
+            used_layer = "auto";
+        end
+        if local_is_flat(score_map)
+            % A near-uniform map means the feature layer is wrong (plan's own
+            % check); prefer occlusion over reporting a meaningless heatmap.
+            use_occlusion = true;
+        end
+    catch ME_grad
+        warning('NETRA:GradCAMFallback', ...
+            'Grad-CAM could not run (%s); using occlusion sensitivity.', ME_grad.message);
+        use_occlusion = true;
     end
-catch ME_grad
-    warning('NETRA:GradCAMFallback', ...
-        ['Grad-CAM could not run (%s). Falling back to occlusion sensitivity, ' ...
-         'which needs no internal-layer access and works on the nested hybrid.'], ...
-        ME_grad.message);
+end
+
+if use_occlusion
     score_map = local_occlusion(net, X, class_idx, cfg);
     method = "occlusion-sensitivity";
     used_layer = "";
@@ -204,6 +220,30 @@ dlX = dlarray(single(X), 'SSCB');
 y = predict(net, dlX);
 y = gather(extractdata(y));
 scores = double(y(:)).';
+end
+
+function tf = local_has_nested(net)
+% True if the network contains a nested sub-network (a networkLayer branch), as
+% the Phase 4 hybrid does. gradCAM cannot see convolutions inside one.
+tf = false;
+for i = 1:numel(net.Layers)
+    L = net.Layers(i);
+    if isprop(L, 'Network') && isa(L.Network, 'dlnetwork')
+        tf = true;
+        return;
+    end
+end
+end
+
+function tf = local_is_flat(m)
+% True if a score map carries essentially no spatial signal -- the signature of
+% a wrong Grad-CAM feature layer. Uses the coefficient of variation so it is
+% scale-independent.
+m = double(m(:));
+if ~all(isfinite(m)), tf = true; return; end
+rng_ = max(m) - min(m);
+cv = std(m) / (mean(abs(m)) + eps);
+tf = rng_ < 1e-6 || cv < 0.02;
 end
 
 function m = local_occlusion(net, X, class_idx, cfg)
