@@ -606,6 +606,12 @@ panel "Occlusion sensitivity" instead of "Grad-CAM". A flat network (like the de
 <table>
 <thead><tr><th>Date</th><th>Change</th></tr></thead>
 <tbody>
+<tr><td>2026-09-23</td><td><b>Professional single-page report redesign.</b> Rebuilt <code>generate_pdf_report.m</code>
+around clinician feedback: NETRA logo + wordmark and patient header up top, a round severity badge, a compact grade
+probability strip, and only the three doctor-relevant images (enhanced fundus, AI findings with lesions marked, AI
+attention). Dropped the engineering pipeline montage and pixel-level anatomy; findings are now concise (lesions
+present, macular proximity, and the explainability sentence: attention on lesion regions vs chance) with a clear
+recommendation line. Raster export (200 DPI) fixed the earlier hang; fixed prior text overflow.</td></tr>
 <tr><td>2026-09-22</td><td><b>Richer two-page report.</b> Page 1's segmentation panel is now a full
 <em>clinical overlay</em> (lesions + vessels + optic-disc boundary + fovea, with a colour key), matching
 run_walkthrough's composite. Added a <em>page 2</em>: the pipeline stages as labelled panels (raw → enhanced →
