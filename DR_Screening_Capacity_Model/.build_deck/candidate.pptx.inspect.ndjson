@@ -1,0 +1,49 @@
+{"kind":"deck","id":"pr/oephml","name":"Deck"}
+{"kind":"layout","layoutId":"7b09e8bf-cb5d-4c23-9893-b882528e45cb","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"8c47900f-eceb-4472-8edd-8ad8b7896cb6","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/o599pl","slide":1,"title":"DR Screening District Capacity Model","textShapes":3}
+{"kind":"textbox","id":"sh/07ap4nmd","slide":1,"text":"DR Screening District Capacity Model","textPreview":"DR Screening District Capacity Model","textChars":36,"textLines":1,"bbox":[72,130,850,68]}
+{"kind":"textbox","id":"sh/f61obils","slide":1,"text":"SimEvents operational capacity model for rural screening deployment","textPreview":"SimEvents operational capacity model for rural screening deployment","textChars":67,"textLines":1,"bbox":[72,215,770,42]}
+{"kind":"textbox","id":"sh/e5872d4n","slide":1,"text":"SIH 2026 demo package","textPreview":"SIH 2026 demo package","textChars":21,"textLines":1,"bbox":[72,570,360,30]}
+{"kind":"notes","id":"nt/o599pl","slide":1,"text":""}
+{"kind":"slide","id":"sl/76aokf","slide":2,"title":"Operational model architecture","textShapes":13}
+{"kind":"textbox","id":"sh/i1kzqt4f","slide":2,"text":"Operational model architecture","textPreview":"Operational model architecture","textChars":30,"textLines":1,"bbox":[64,42,1152,50]}
+{"kind":"textbox","id":"sh/54bi1onq","slide":2,"text":"Patient flow models capture, quality recapture, AI routing, review capacity, and deferred image sync.","textPreview":"Patient flow models capture, quality recapture, AI routing, review capacity, and deferred image sync.","textChars":101,"textLines":1,"bbox":[64,105,1090,36]}
+{"kind":"textbox","id":"sh/k32hs3m5","slide":2,"text":"Clinical performance remains external telemetry. The model evaluates operational queues and capacity only.","textPreview":"Clinical performance remains external telemetry. The model evaluates operational queues and capacity only.","textChars":106,"textLines":1,"bbox":[64,150,1090,36]}
+{"kind":"textbox","id":"sh/vy90ve5o","slide":2,"text":"Patient arrivals","textPreview":"Patient arrivals","textChars":16,"textLines":1,"bbox":[68,245,190,76]}
+{"kind":"shape","id":"sh/ax0zm943","slide":2,"bbox":[259,283,38,0]}
+{"kind":"textbox","id":"sh/x0bixonu","slide":2,"text":"Camera queue","textPreview":"Camera queue","textChars":12,"textLines":1,"bbox":[303,245,190,76]}
+{"kind":"shape","id":"sh/wzihojm9","slide":2,"bbox":[494,283,38,0]}
+{"kind":"textbox","id":"sh/fud07ils","slide":2,"text":"Quality recapture","textPreview":"Quality recapture","textChars":17,"textLines":1,"bbox":[538,245,190,76]}
+{"kind":"shape","id":"sh/ut4jyd4n","slide":2,"bbox":[729,283,38,0]}
+{"kind":"textbox","id":"sh/4n2dkv6p","slide":2,"text":"AI routing","textPreview":"AI routing","textChars":10,"textLines":1,"bbox":[773,245,190,76]}
+{"kind":"shape","id":"sh/5obed0na","slide":2,"bbox":[964,283,38,0]}
+{"kind":"textbox","id":"sh/il0viloz","slide":2,"text":"Review / auto-clear","textPreview":"Review / auto-clear","textChars":19,"textLines":1,"bbox":[1008,245,190,76]}
+{"kind":"textbox","id":"sh/3mtcbq54","slide":2,"text":"Processed image copy","textPreview":"Processed image copy","textChars":20,"textLines":1,"bbox":[68,435,190,76]}
+{"kind":"shape","id":"sh/gjidgv6t","slide":2,"bbox":[259,473,38,0]}
+{"kind":"textbox","id":"sh/hkru90ne","slide":2,"text":"Local sync queue","textPreview":"Local sync queue","textChars":16,"textLines":1,"bbox":[303,435,190,76]}
+{"kind":"shape","id":"sh/uh0velon","slide":2,"bbox":[494,473,38,0]}
+{"kind":"textbox","id":"sh/vi9c7q58","slide":2,"text":"Connectivity gate","textPreview":"Connectivity gate","textChars":17,"textLines":1,"bbox":[538,435,190,76]}
+{"kind":"shape","id":"sh/8fidcb6h","slide":2,"bbox":[729,473,38,0]}
+{"kind":"textbox","id":"sh/tgru5gn2","slide":2,"text":"Bandwidth server","textPreview":"Bandwidth server","textChars":16,"textLines":1,"bbox":[773,435,190,76]}
+{"kind":"shape","id":"sh/p0z2t8vu","slide":2,"bbox":[964,473,38,0]}
+{"kind":"textbox","id":"sh/ozq1k3u9","slide":2,"text":"District server","textPreview":"District server","textChars":15,"textLines":1,"bbox":[1008,435,190,76]}
+{"kind":"notes","id":"nt/76aokf","slide":2,"text":""}
+{"kind":"slide","id":"sl/7dcwar","slide":3,"title":"Current simulation summary","textShapes":1}
+{"kind":"textbox","id":"sh/c3ylwbax","slide":3,"text":"Current simulation summary","textPreview":"Current simulation summary","textChars":26,"textLines":1,"bbox":[64,42,1152,50]}
+{"kind":"image","id":"im/qh4nid43","slide":3,"name":"","alt":"Summary dashboard with AI workload, confidence, bandwidth, and utilization charts","bbox":[64,115,1152,540]}
+{"kind":"notes","id":"nt/7dcwar","slide":3,"text":""}
+{"kind":"slide","id":"sl/lfy5b7","slide":4,"title":"Confidence and quality scenarios","textShapes":2}
+{"kind":"textbox","id":"sh/za9gjqlo","slide":4,"text":"Confidence and quality scenarios","textPreview":"Confidence and quality scenarios","textChars":32,"textLines":1,"bbox":[64,42,1152,50]}
+{"kind":"textbox","id":"sh/q50fmlkr","slide":4,"text":"Higher routing threshold increases simulated referral volume. Higher rejection raises camera attempts.","textPreview":"Higher routing threshold increases simulated referral volume. Higher rejection raises camera attempts.","textChars":102,"textLines":1,"bbox":[64,645,1120,26]}
+{"kind":"image","id":"im/dsf21kjm","slide":4,"name":"","alt":"Confidence threshold sweep","bbox":[55,125,560,500]}
+{"kind":"image","id":"im/c76l8z21","slide":4,"name":"","alt":"Camera, ophthalmologist, and quality rejection sweeps","bbox":[650,125,560,500]}
+{"kind":"notes","id":"nt/lfy5b7","slide":4,"text":""}
+{"kind":"slide","id":"sl/1zu9bc","slide":5,"title":"Bandwidth and minimum configuration","textShapes":5}
+{"kind":"textbox","id":"sh/cnyt4z6t","slide":5,"text":"Bandwidth and minimum configuration","textPreview":"Bandwidth and minimum configuration","textChars":35,"textLines":1,"bbox":[64,42,1152,50]}
+{"kind":"textbox","id":"sh/qlgb2p8n","slide":5,"text":"Minimum feasible configuration under current illustrative assumptions","textPreview":"Minimum feasible configuration under current illustrative assumptions","textChars":69,"textLines":1,"bbox":[680,145,470,36]}
+{"kind":"textbox","id":"sh/ls7u1o7a","slide":5,"text":"1 camera\n1 ophthalmologist\n5 Mbps bandwidth\n399 patients per camp\n0 end-of-camp sync backlog","textPreview":"1 camera | 1 ophthalmologist | 5 Mbps bandwidth | 399 patients per camp | 0 end-of-camp sync backlog","textChars":92,"textLines":5,"bbox":[710,220,400,260]}
+{"kind":"textbox","id":"sh/0ryt8j65","slide":5,"text":"Replace config.m placeholders with measured field telemetry before making deployment claims.","textPreview":"Replace config.m placeholders with measured field telemetry before making deployment claims.","textChars":92,"textLines":1,"bbox":[680,540,460,58]}
+{"kind":"textbox","id":"sh/zqpczepk","slide":5,"text":"Demo: AI-OFF vs AI-ON, quality rejection, low bandwidth, restored connectivity, then resource recommendation.","textPreview":"Demo: AI-OFF vs AI-ON, quality rejection, low bandwidth, restored connectivity, then resource recommendation.","textChars":109,"textLines":1,"bbox":[64,640,1100,28]}
+{"kind":"image","id":"im/ipgf6hcz","slide":5,"name":"","alt":"Bandwidth versus deferred-sync backlog","bbox":[64,125,560,470]}
+{"kind":"notes","id":"nt/1zu9bc","slide":5,"text":""}

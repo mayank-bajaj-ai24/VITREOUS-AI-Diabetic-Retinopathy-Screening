@@ -1,0 +1,2 @@
+numCameras,numOphthalmologists,bandwidthMbps,throughputPerDay,reviewMeanWait,syncBacklogEnd,cameraUtilization,reviewUtilization,syncUtilization,feasible,cost
+1,1,5,399,0,0,0.700000000000005,0.365828237909952,0.199147068220641,1,3.5
