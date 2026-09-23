@@ -244,10 +244,7 @@ data/sample_images/walkthrough/
 # NETRA: model snapshots and comparison output
 data/sample_images/comparison/
 
-# Node / Frontend
-node_modules/
-app/node_modules/
-dist/
-app/dist/
-.vite/
-
+# DR Screening Capacity Model: generated Simulink caches and local deck dependencies
+DR_Screening_Capacity_Model/slprj/
+DR_Screening_Capacity_Model/*.slxc
+DR_Screening_Capacity_Model/.build_deck/node_modules/
