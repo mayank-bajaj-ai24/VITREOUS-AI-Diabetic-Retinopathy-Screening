@@ -83,11 +83,11 @@ try, fig.Theme = 'light'; catch, end %#ok<CTCH>
 sq = @(w) w * W / H;   % normalized height that renders square for a given width
 
 % ── Header: logo + wordmark (left), patient details (right) ──
-local_logo_box(fig, root, [0.035 0.928 0.052]);
-annotation(fig, 'textbox', [0.098 0.945 0.4 0.035], 'String', 'NETRA', ...
-    'Color', brand, 'FontSize', 24, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
+local_logo_box(fig, root, [0.035 0.920 0.052]);
+annotation(fig, 'textbox', [0.098 0.937 0.4 0.026], 'String', 'NETRA', ...
+    'Color', brand, 'FontSize', 23, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
     'VerticalAlignment', 'middle', 'Interpreter', 'none');
-annotation(fig, 'textbox', [0.100 0.923 0.45 0.02], 'String', ...
+annotation(fig, 'textbox', [0.100 0.916 0.45 0.018], 'String', ...
     'National Eye Triage & Retinal Assessment', 'Color', mute, 'FontSize', 9.5, ...
     'EdgeColor', 'none', 'VerticalAlignment', 'middle', 'Interpreter', 'none');
 
@@ -114,18 +114,18 @@ annotation(fig, 'textbox', [0.035 0.845 0.6 0.02], 'String', 'DR SEVERITY ASSESS
 
 local_grade_badge(fig, [0.045 0.752 0.085 sq(0.085)], g.grade, gcol, gtint, mute);
 
-annotation(fig, 'textbox', [0.165 0.800 0.42 0.036], 'String', char(string(g.grade_name)), ...
+annotation(fig, 'textbox', [0.165 0.792 0.44 0.034], 'String', char(string(g.grade_name)), ...
     'Color', gcol, 'FontSize', 19, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
     'VerticalAlignment', 'middle', 'Interpreter', 'none');
 if g.referable
-    ref = 'REFERABLE — refer to an ophthalmologist'; rcol = sev(5, :);
+    ref = 'REFERABLE - refer to an ophthalmologist'; rcol = sev(5, :);
 else
-    ref = 'NOT REFERABLE — routine re-screening'; rcol = sev(1, :);
+    ref = 'NOT REFERABLE - routine re-screening'; rcol = sev(1, :);
 end
-annotation(fig, 'textbox', [0.165 0.778 0.5 0.022], 'String', ref, 'Color', rcol, ...
+annotation(fig, 'textbox', [0.165 0.770 0.44 0.022], 'String', ref, 'Color', rcol, ...
     'FontSize', 12, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
     'VerticalAlignment', 'middle', 'Interpreter', 'none');
-annotation(fig, 'textbox', [0.165 0.757 0.4 0.02], 'String', ...
+annotation(fig, 'textbox', [0.165 0.750 0.4 0.02], 'String', ...
     sprintf('Model confidence: %.0f%%', 100 * disp_conf), 'Color', ink, 'FontSize', 11, ...
     'EdgeColor', 'none', 'VerticalAlignment', 'middle', 'Interpreter', 'none');
 
@@ -231,19 +231,18 @@ set(ax, 'YDir', 'reverse', 'YTick', 1:n, 'YTickLabel', icdr(1:n), 'XLim', [0 1.1
 title(ax, 'Grade probabilities', 'FontSize', 9.5, 'FontWeight', 'bold', 'Color', mute);
 end
 
-function local_findings_card(fig, pos, ttl, lines, ink, mute, hair)
+function local_findings_card(fig, pos, ttl, lines, ink, mute, hair) %#ok<INUSD>
+% Card with a bold title and a single auto-wrapping text body, so line spacing is
+% even and tight (one box per line spaced them out unevenly).
 annotation(fig, 'rectangle', pos, 'FaceColor', [0.975 0.982 0.99], 'Color', hair, 'LineWidth', 0.75);
-x = pos(1) + 0.015; y = pos(2); w = pos(3) - 0.03; h = pos(4);
-annotation(fig, 'textbox', [x y+h-0.028 w 0.024], 'String', ttl, 'Color', ink, ...
+x = pos(1) + 0.018; y = pos(2); w = pos(3) - 0.036; h = pos(4);
+annotation(fig, 'textbox', [x y+h-0.03 w 0.024], 'String', ttl, 'Color', ink, ...
     'FontSize', 11, 'FontWeight', 'bold', 'EdgeColor', 'none', 'VerticalAlignment', 'middle', ...
     'Interpreter', 'none');
-yr = y + h - 0.058; dh = 0.026;
-for i = 1:numel(lines)
-    if strlength(lines(i)) == 0, yr = yr - dh * 0.4; continue; end
-    annotation(fig, 'textbox', [x yr w dh], 'String', char(lines(i)), 'Color', ink, ...
-        'FontSize', 10, 'EdgeColor', 'none', 'VerticalAlignment', 'top', 'Interpreter', 'none');
-    yr = yr - dh;
-end
+body = strjoin(cellstr(lines(:)), newline);
+annotation(fig, 'textbox', [x y+0.012 w h-0.052], 'String', body, 'Color', ink, ...
+    'FontSize', 10, 'EdgeColor', 'none', 'VerticalAlignment', 'top', 'FitBoxToText', 'off', ...
+    'Interpreter', 'none');
 end
 
 % ═══════════════════════════ content builders ═══════════════════════════
@@ -270,12 +269,11 @@ if ~any_les
 end
 dd = local_nearest_lesion_dd(r);
 if ~isnan(dd)
-    lines(end+1) = '';
+    lines(end+1) = ''; %#ok<AGROW>
     if dd < 1.0
-        lines(end+1) = sprintf('Macular involvement: nearest lesion %.1f disc diameters', dd);
-        lines(end+1) = 'from the fovea — sight-threatening.';
+        lines(end+1) = sprintf('Macular involvement: nearest lesion %.1f disc diameters from the fovea - sight-threatening.', dd); %#ok<AGROW>
     else
-        lines(end+1) = sprintf('Nearest lesion %.1f disc diameters from the fovea.', dd);
+        lines(end+1) = sprintf('Nearest lesion %.1f disc diameters from the fovea.', dd); %#ok<AGROW>
     end
 end
 end
@@ -285,27 +283,24 @@ function lines = local_xai_summary(xai, g) %#ok<INUSD>
 lines = strings(0, 1);
 if isfield(xai, 'iou') && ~isempty(xai.iou) && isfield(xai.iou, 'attention_mass_near_lesion')
     a = xai.iou;
-    lines(end+1) = sprintf('Attention on lesion regions: %.0f%%', 100 * a.attention_mass_near_lesion);
-    lines(end+1) = sprintf('(vs %.0f%% expected by chance).', 100 * a.control_mass_near);
+    lines(end+1) = sprintf('Attention on lesion regions: %.0f%% (vs %.0f%% expected by chance).', ...
+        100 * a.attention_mass_near_lesion, 100 * a.control_mass_near); %#ok<AGROW>
     if isfield(a, 'attention_lesion_corr')
-        lines(end+1) = sprintf('Attention–lesion correlation: %+.2f.', a.attention_lesion_corr);
+        lines(end+1) = sprintf('Attention-lesion correlation: %+.2f.', a.attention_lesion_corr); %#ok<AGROW>
     end
-    lines(end+1) = '';
+    lines(end+1) = ''; %#ok<AGROW>
     if isfield(a, 'mass_lift') && a.mass_lift > 0.05
-        lines(end+1) = 'The grade is supported by pathology the';
-        lines(end+1) = 'model visibly attended to.';
+        lines(end+1) = 'The grade is supported by pathology the model visibly attended to.'; %#ok<AGROW>
     else
-        lines(end+1) = 'The model relied on diffuse cues; correlate';
-        lines(end+1) = 'with the marked lesions.';
+        lines(end+1) = 'The model relied on diffuse cues; correlate with the marked lesions.'; %#ok<AGROW>
     end
 else
-    lines(end+1) = 'Attention map generated; see the AI attention';
-    lines(end+1) = 'panel above.';
+    lines(end+1) = 'Attention map generated; see the AI attention panel above.'; %#ok<AGROW>
 end
 if isfield(xai, 'calibration') && ~isempty(xai.calibration)
     c = xai.calibration;
-    lines(end+1) = '';
-    lines(end+1) = sprintf('Confidence calibrated (T=%.2f).', c.T);
+    lines(end+1) = ''; %#ok<AGROW>
+    lines(end+1) = sprintf('Confidence calibrated (temperature T = %.2f).', c.T); %#ok<AGROW>
 end
 end
 
