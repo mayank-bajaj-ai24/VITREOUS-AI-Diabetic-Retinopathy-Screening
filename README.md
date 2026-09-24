@@ -27,8 +27,8 @@ Raw Fundus Image
   → Parallel Dual-Track MATLAB AI:
        Track A: UNet++ Lesion Segmentation
        Track B: EfficientNet-B4 + ResNet-50 Hybrid Grading
-  → MATLAB XAI & Calibration (gradcam(), Temperature Scaling)
-  → Clinical Decision Support → PDF Report
+  → MATLAB XAI & Calibration (Grad-CAM / occlusion attention, Temperature Scaling)
+  → Clinical Decision Support → NETRA PDF Report
 ```
 
 ## Tech Stack & MATLAB Toolboxes
@@ -51,8 +51,9 @@ NETRA/
 │   ├── quality/          # Phase 1: Quality Gate Module [DONE ✅]
 │   ├── enhancement/      # Phase 2: Quality-Adaptive Enhancement [DONE ✅]
 │   ├── segmentation/     # Phase 3: Structure & Lesion Segmentation [DONE ✅]
-│   ├── classification/   # Phase 4: DR Severity Grading Hybrid Model [PLANNED ⏳]
-│   ├── explainability/   # Phase 5: Grad-CAM XAI & Calibration [PLANNED ⏳]
+│   ├── classification/   # Phase 4: DR Severity Grading Hybrid Model [DONE ✅]
+│   ├── explainability/   # Phase 5: Attention XAI & Calibration [DONE ✅]
+│   ├── reporting/        # Phase 5: Clinical PDF Report Generator [DONE ✅]
 │   ├── simulink/         # Phase 5: SimEvents Operational Model [PLANNED ⏳]
 │   ├── app/              # Phase 5: MATLAB App Designer GUI [PLANNED ⏳]
 │   ├── demo/             # Pipeline demos [DONE ✅]
@@ -113,6 +114,39 @@ Nested UNet++ (depth 4, 2.3M parameters) trained on CPU in 145 minutes.
 Measured on 16 validation images, so these figures carry wide error bars. The
 binding constraint is training data volume: IDRiD provides 81 annotated images
 and no healthy retinas. See the implementation plan for known limitations.
+
+## Phase 5 — Explainability, Calibration & Reporting
+
+Phase 5 makes the grader's decision **auditable** and turns it into a clinical
+report a doctor can read.
+
+- **Attention explainability** — Grad-CAM where the network allows it, with an
+  automatic **occlusion-sensitivity** fallback for the dual-branch hybrid (whose
+  backbones are nested, out of Grad-CAM's reach). The map shows which retinal
+  regions actually drove the grade.
+- **Attention–lesion alignment** — quantifies whether the model looks at *real
+  disease* by comparing its attention to Phase 3's lesion masks against a
+  rotated-mask control. On the sample image, **69% of the model's attention
+  falls on lesion regions vs 46% expected by chance** (attention–lesion
+  correlation **+0.50**) — evidence the grade rests on visible pathology.
+- **Confidence calibration** — temperature scaling recalibrates the softmax so
+  the reported confidence is trustworthy, reporting Expected Calibration Error
+  before and after.
+- **Clinical PDF report** — a branded single-page NETRA report: severity grade,
+  referral decision, the enhanced fundus, annotated lesions, the AI attention
+  map, concise findings and a recommendation.
+
+Run the whole Phase 5 chain end to end on one image (uses the trained Phase 4
+grading model if present, otherwise a development stub):
+
+```matlab
+cd matlab/demo
+run_explainability_demo          % writes data/processed/reports/report_<id>.pdf
+```
+
+Unit tests: `runtests('test_explainability')` (16 tests). A full line-by-line
+walkthrough of the module lives in
+[`docs/phase5-explainability-guide.html`](docs/phase5-explainability-guide.html).
 
 ## Target Metrics
 
