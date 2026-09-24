@@ -234,6 +234,9 @@ data/processed/models/*
 # demos without training anything or downloading a 900 MB dataset first.
 !data/processed/models/v4_resnet18.mat
 !data/processed/models/v4_resnet18_manifest.mat
+# Phase 4 grading model (via Git LFS) so Phase 5 explainability runs on real
+# predictions, not a stub. Large binary, tracked by LFS (.gitattributes).
+!data/processed/models/dr_grading_hires.mat
 
 # NETRA: generated walkthrough output
 data/sample_images/walkthrough/

@@ -13,7 +13,10 @@ proj_root = fullfile(script_dir, '..', '..');
 addpath(genpath(fullfile(proj_root, 'matlab')));
 testCase.TestData.proj_root = proj_root;
 testCase.TestData.cfg = load_config(fullfile(proj_root, 'configs', 'default_config.yaml'));
-testCase.TestData.has_dlt = ~isempty(ver('deeplearning'));
+% Detect the Deep Learning Toolbox by the functions we actually use, not by
+% ver('deeplearning') -- that identifier returns empty on R2026a even when the
+% toolbox is installed, which would silently skip every network test.
+testCase.TestData.has_dlt = ~isempty(which('dlnetwork')) && ~isempty(which('gradCAM'));
 end
 
 % ─── apply_temperature ────────────────────────────────────────────────────
@@ -126,6 +129,44 @@ info = dir(p);
 verifyGreaterThan(testCase, info.bytes, 0);
 end
 
+function testReportAcceptsPhase4GradeStruct(testCase)
+% grade_dr_severity returns .probabilities (not .probs) and no .canvas. The
+% report must take probabilities and pull the canvas from the Grad-CAM result.
+[att, r] = local_aligned_fixture();
+g = struct('grade', 2, 'grade_name', "Moderate NPDR", ...
+    'probabilities', [0.05 0.10 0.60 0.20 0.05], 'confidence', 0.60, ...
+    'referable', true, 'mode', 'end-to-end');
+gc = struct('score_map_canvas', att, 'canvas', repmat(0.4, 512, 512, 3), ...
+    'feature_layer', "effnet/conv_last");
+xai = struct('gradcam', gc, 'iou', attention_lesion_iou(att, r, testCase.TestData.cfg));
+out = fullfile(tempdir, ['netra_report_' char(matlab.lang.internal.uuid()) '.pdf']);
+cleanup = onCleanup(@() local_delete(out)); %#ok<NASGU>
+p = generate_pdf_report(out, r, g, xai, testCase.TestData.cfg, struct('ImageName', 'p4.png'));
+verifyTrue(testCase, isfile(p));
+end
+
+% ─── Calibration bridge to Phase 4 (needs Deep Learning Toolbox) ──────────
+
+function testCollectGradingLogitsWithStub(testCase)
+% collect_grading_logits drives grade_dr_severity; a bare stub dlnetwork is a
+% valid end-to-end model for it, so this also checks Phase 4 inference runs.
+local_assume_dlt(testCase);
+cfg = testCase.TestData.cfg;
+root = testCase.TestData.proj_root;
+samples = dir(fullfile(root, 'data', 'sample_images', '*.png'));
+assumeTrue(testCase, numel(samples) >= 2, 'need >= 2 sample images');
+net = make_stub_grading_net(cfg);
+imgs = {fullfile(samples(1).folder, samples(1).name), ...
+        fullfile(samples(2).folder, samples(2).name)};
+[lg, lb] = collect_grading_logits(imgs, [0; 2], net, cfg, struct('Verbose', false));
+verifyEqual(testCase, size(lg, 2), 5);
+verifyEqual(testCase, size(lg, 1), numel(lb));
+verifyLessThanOrEqual(testCase, size(lg, 1), 2);
+% Fitting temperature on these must run and preserve accuracy invariance.
+cal = temperature_scaling(lg, lb, cfg);
+verifyGreaterThan(testCase, cal.T, 0);
+end
+
 % ─── Grad-CAM + stub (need Deep Learning Toolbox) ─────────────────────────
 
 function testStubGradeContract(testCase)
@@ -175,19 +216,29 @@ end
 
 function [att, r] = local_aligned_fixture()
 % A 512 canvas with a circular retina, a background, and one square lesion
-% block; attention is a Gaussian centred on that block.
+% block; attention is a tight Gaussian centred on that block.
+%
+% Two properties matter for the test to be meaningful:
+%   - The lesion is placed OFF-CENTRE. The IoU control rotates the mask 180°
+%     about the image centre; a centred lesion would map almost onto itself and
+%     the control would be indistinguishable from the truth (no lift).
+%   - The attention Gaussian is NARROW (sigma 12) relative to the 61-px block,
+%     so the bulk of its mass lands inside the lesion. A wide Gaussian spills
+%     onto background and drives attention_mass_on_lesion down for reasons that
+%     have nothing to do with the code under test.
 S = 512;
 [xx, yy] = meshgrid(1:S, 1:S);
 retina = (xx - S/2).^2 + (yy - S/2).^2 <= (S/2 - 10)^2;
 
+cx = 330; cy = 330;                            % lesion centroid, off-centre
 label_map = zeros(S, S);
 label_map(retina) = 1;                         % background inside retina
 les = false(S, S);
-les(240:280, 240:280) = true;                  % a haemorrhage-sized block
+les(cy-30:cy+30, cx-30:cx+30) = true;          % 61x61 haemorrhage-sized block
 les = les & retina;
 label_map(les) = 3;                            % class 3 = haemorrhage
 
-att = exp(-((xx - 260).^2 + (yy - 260).^2) / (2 * 30^2));
+att = exp(-((xx - cx).^2 + (yy - cy).^2) / (2 * 12^2));
 
 r = struct();
 r.label_map = label_map;
@@ -198,7 +249,7 @@ r.stats = struct( ...
                             'area_fraction', nnz(les) / nnz(retina)), ...
     'hard_exudate',  struct('pixels', 0, 'regions', 0, 'area_fraction', 0), ...
     'soft_exudate',  struct('pixels', 0, 'regions', 0, 'area_fraction', 0));
-r.optic_disc = struct('fovea_center', [260, 260], 'disc_radius', 30, ...
+r.optic_disc = struct('fovea_center', [cx, cy], 'disc_radius', 30, ...
     'disc_mask', false(S, S), 'exclusion_mask', false(S, S));
 end
 

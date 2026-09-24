@@ -1,43 +1,35 @@
 function out_path = generate_pdf_report(output_path, r, g, xai, cfg, options)
-% GENERATE_PDF_REPORT  One-page clinical DR screening report as a PDF
+% GENERATE_PDF_REPORT  One-page NETRA clinical DR screening report (PDF)
 %
 %   out_path = generate_pdf_report(output_path, r, g, xai, cfg)
 %   out_path = generate_pdf_report(output_path, r, g, xai, cfg, options)
 %
-%   Phase 5 reporting. Assembles everything the pipeline produced -- the quality
-%   verdict, the enhanced fundus, Phase 3's lesion overlay, the grade and its
-%   calibrated confidence, and the Grad-CAM attention with its lesion-alignment
-%   check -- onto a single page a clinician can read at a glance.
+%   Phase 5 reporting. Produces a single, clean, branded page for a clinician:
+%   patient header, the DR grade and referral decision, three clinically
+%   meaningful images (enhanced fundus, annotated findings, AI attention), a
+%   concise findings summary with NETRA's explainability result, and a clear
+%   recommendation. It deliberately omits engineering views (raw capture, vessel
+%   and disc detection stages, pixel-level anatomy) -- those belong in the
+%   walkthrough, not a doctor's report.
 %
-%   Two design choices worth stating:
-%     - It renders through a figure and exportgraphics, which is base MATLAB, so
-%       it needs no Report Generator add-on (absent on a clean install, like the
-%       ONNX and pretrained-network add-ons Phase 3 and 4 tripped over).
-%     - It always prints the quality-gate verdict. A report that does not say the
-%       image passed Phase 1 is asserting a grade without saying the image was
-%       gradeable (plan, Phase 5 Step 4).
-%
-%   Lesion distance to the fovea is reported in DISC DIAMETERS, the unit
-%   clinicians use: a handful of microaneurysms at the macula threatens sight far
-%   more than the same lesions in the periphery.
+%   Rendered through a figure and exportgraphics as a raster page (the content is
+%   mostly fundus photographs, so a vector PDF would be huge and slow), needing no
+%   Report Generator add-on.
 %
 %   Inputs:
 %     output_path - target .pdf path (directory created if needed)
-%     r           - Phase 3 segment_lesions result (label_map, stats, optic_disc)
-%     g           - Phase 4 grade result (grade, grade_name, probs, confidence,
-%                   referable, canvas). During development, from
-%                   stub_grade_dr_severity.
-%     xai         - Struct of explainability results:
-%                     .gradcam     - generate_gradcam result (uses .overlay)
-%                     .iou         - attention_lesion_iou result (optional)
-%                     .calibration - temperature_scaling result (optional)
-%                     .quality     - quality_gate result (optional)
+%     r           - Phase 3 segment_lesions result (label_map, stats, optic_disc, vessels)
+%     g           - Phase 4 grade result (grade, grade_name, probabilities,
+%                   confidence, referable, quality)
+%     xai         - Struct: .gradcam (generate_gradcam result, carries .canvas),
+%                   .iou (attention_lesion_iou), .calibration (temperature_scaling)
 %     cfg         - config struct from load_config
 %     options     - Optional struct:
-%       .PatientId   - char/string shown in the header (default 'N/A')
-%       .ImageName   - char/string shown in the header (default '')
-%       .Confidence  - override confidence to display (e.g. calibrated); default
-%                      g.confidence
+%       .PatientId   - shown in the header (default 'N/A')
+%       .PatientName - shown in the header (default '')
+%       .ImageName   - shown in the header (default '')
+%       .Confidence  - confidence to display (default g.confidence)
+%       .Canvas      - enhanced canvas, if the grade result carries none
 %
 %   Output:
 %     out_path - the written PDF path
@@ -49,198 +41,379 @@ if nargin < 6, options = struct(); end
 if nargin < 5, cfg = struct(); end
 if nargin < 4, xai = struct(); end
 
-patient_id = local_opt(options, 'PatientId', 'N/A');
-image_name = local_opt(options, 'ImageName', '');
-disp_conf  = local_opt(options, 'Confidence', g.confidence);
-disclaimer = local_cfg(cfg, {'reporting', 'disclaimer'}, ...
-    'Research prototype. Not a medical device.');
+here = fileparts(mfilename('fullpath'));
+root = fullfile(here, '..', '..');
 
-% ─── Ensure output directory and extension ───────────────────────────────
+patient_id   = local_opt(options, 'PatientId', 'N/A');
+patient_name = local_opt(options, 'PatientName', '');
+image_name   = local_opt(options, 'ImageName', '');
+disp_conf    = local_opt(options, 'Confidence', g.confidence);
+disclaimer   = local_cfg(cfg, {'reporting', 'disclaimer'}, ...
+    'Research prototype. Not a medical device. For screening triage support only.');
+
+% ─── Output path ─────────────────────────────────────────────────────────
 [out_dir, base, ext] = fileparts(char(output_path));
-if isempty(ext)
-    ext = '.pdf';
-end
-if ~strcmpi(ext, '.pdf')
-    ext = '.pdf';   % this reporter emits PDF only
-end
-if ~isempty(out_dir) && ~isfolder(out_dir)
-    mkdir(out_dir);
-end
+if isempty(ext) || ~strcmpi(ext, '.pdf'), ext = '.pdf'; end
+if ~isempty(out_dir) && ~isfolder(out_dir), mkdir(out_dir); end
 out_path = fullfile(out_dir, [base ext]);
 
-classes = lesion_classes();
-canvas = im2double(g.canvas);
+classes   = lesion_classes();
+probs     = local_grade_probs(g);
+canvas    = local_report_canvas(g, xai, options);
 label_map = double(r.label_map);
 
-% ─── Build the composite images ──────────────────────────────────────────
-lesion_overlay = local_lesion_overlay(canvas, label_map, classes);
-lesion_overlay = overlay_legend(lesion_overlay);
+% ─── Palette ─────────────────────────────────────────────────────────────
+ink   = [0.13 0.16 0.22];
+mute  = [0.45 0.50 0.58];
+brand = [0.10 0.42 0.62];       % NETRA blue
+hair  = [0.83 0.86 0.90];
+sev = [0.16 0.63 0.30; 0.62 0.71 0.11; 0.95 0.62 0.07; 0.90 0.38 0.06; 0.80 0.13 0.13];
+gi = min(g.grade + 1, 5);
+gcol = sev(gi, :);
+gtint = gcol * 0.18 + 0.82;     % light fill for the grade badge
 
-if isfield(xai, 'gradcam') && isfield(xai.gradcam, 'overlay')
-    gradcam_img = xai.gradcam.overlay;
+% ─── Images (only the doctor-relevant three) ─────────────────────────────
+annotated = local_clinical_overlay(canvas, r, label_map, classes);
+attention = local_gradcam_image(canvas, label_map, xai, cfg);
+
+% ─── Figure (A4 portrait proportions) ────────────────────────────────────
+W = 1000; H = 1414;
+fig = figure('Visible', 'off', 'Color', 'w', 'Units', 'pixels', 'Position', [60 60 W H]);
+try, fig.Theme = 'light'; catch, end %#ok<CTCH>
+sq = @(w) w * W / H;   % normalized height that renders square for a given width
+
+% ── Header: logo + wordmark (left), patient details (right) ──
+local_logo_box(fig, root, [0.035 0.920 0.052]);
+annotation(fig, 'textbox', [0.098 0.937 0.4 0.026], 'String', 'NETRA', ...
+    'Color', brand, 'FontSize', 23, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
+    'VerticalAlignment', 'middle', 'Interpreter', 'none');
+annotation(fig, 'textbox', [0.100 0.916 0.45 0.018], 'String', ...
+    'National Eye Triage & Retinal Assessment', 'Color', mute, 'FontSize', 9.5, ...
+    'EdgeColor', 'none', 'VerticalAlignment', 'middle', 'Interpreter', 'none');
+
+stamp = char(datetime('now', 'Format', 'dd MMM yyyy, HH:mm'));
+info = {};
+if ~isempty(char(string(patient_name))), info{end+1} = ['Patient: ' char(string(patient_name))]; end
+info{end+1} = ['Patient ID: ' char(string(patient_id))];
+info{end+1} = ['Report date: ' stamp];
+if ~isempty(char(string(image_name))), info{end+1} = ['Image: ' char(string(image_name))]; end
+annotation(fig, 'textbox', [0.55 0.905 0.415 0.062], 'String', info, ...
+    'Color', ink, 'FontSize', 10, 'EdgeColor', 'none', 'HorizontalAlignment', 'right', ...
+    'VerticalAlignment', 'top', 'Interpreter', 'none');
+
+annotation(fig, 'line', [0.035 0.965], [0.902 0.902], 'Color', brand, 'LineWidth', 1.5);
+annotation(fig, 'textbox', [0.035 0.876 0.7 0.022], 'String', ...
+    'Explainable AI-assisted retinal screening — every lesion accounted for.', ...
+    'Color', mute, 'FontSize', 10, 'FontAngle', 'italic', 'EdgeColor', 'none', ...
+    'VerticalAlignment', 'middle', 'Interpreter', 'none');
+
+% ── Diagnosis ──
+annotation(fig, 'textbox', [0.035 0.845 0.6 0.02], 'String', 'DR SEVERITY ASSESSMENT', ...
+    'Color', mute, 'FontSize', 10, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
+    'VerticalAlignment', 'middle', 'Interpreter', 'none');
+
+local_grade_badge(fig, [0.045 0.752 0.085 sq(0.085)], g.grade, gcol, gtint, mute);
+
+annotation(fig, 'textbox', [0.165 0.792 0.44 0.034], 'String', char(string(g.grade_name)), ...
+    'Color', gcol, 'FontSize', 19, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
+    'VerticalAlignment', 'middle', 'Interpreter', 'none');
+if g.referable
+    ref = 'REFERABLE - refer to an ophthalmologist'; rcol = sev(5, :);
 else
-    gradcam_img = im2uint8(canvas);   % nothing to show; fall back to the fundus
+    ref = 'NOT REFERABLE - routine re-screening'; rcol = sev(1, :);
 end
+annotation(fig, 'textbox', [0.165 0.770 0.44 0.022], 'String', ref, 'Color', rcol, ...
+    'FontSize', 12, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
+    'VerticalAlignment', 'middle', 'Interpreter', 'none');
+annotation(fig, 'textbox', [0.165 0.750 0.4 0.02], 'String', ...
+    sprintf('Model confidence: %.0f%%', 100 * disp_conf), 'Color', ink, 'FontSize', 11, ...
+    'EdgeColor', 'none', 'VerticalAlignment', 'middle', 'Interpreter', 'none');
 
-% ─── Figure ──────────────────────────────────────────────────────────────
-fig = figure('Visible', 'off', 'Color', 'w', ...
-    'Units', 'pixels', 'Position', [100 100 1000 1300]);
-tl = tiledlayout(fig, 3, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
+% Compact probability strip on the right of the diagnosis row.
+axP = axes(fig, 'Units', 'normalized', 'Position', [0.63 0.758 0.335 0.082]); %#ok<LAXES>
+local_prob_strip(axP, probs, sev, ink, mute, hair);
 
-% Header spanning the top: title line plus a metadata line beneath it. subtitle
-% is not reliable on a tiledlayout, so both go through title() as two lines.
-stamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm'));
-header = { local_header_line(g, disp_conf), ...
-           sprintf('Patient: %s    Image: %s    Generated: %s', ...
-                   char(string(patient_id)), char(string(image_name)), stamp) };
-h = title(tl, header, 'FontWeight', 'bold', 'Interpreter', 'none');
-h.FontSize = 14;
-
-% Panel 1: enhanced fundus
-ax1 = nexttile(tl);
-imshow(canvas, 'Parent', ax1);
-title(ax1, 'Enhanced fundus (Phase 2)', 'FontSize', 11);
-
-% Panel 2: lesion overlay
-ax2 = nexttile(tl);
-imshow(lesion_overlay, 'Parent', ax2);
-title(ax2, 'Lesion segmentation (Phase 3)', 'FontSize', 11);
-
-% Panel 3: Grad-CAM
-ax3 = nexttile(tl);
-imshow(gradcam_img, 'Parent', ax3);
-gc_title = 'Grad-CAM attention (Phase 5)';
-if isfield(xai, 'gradcam') && isfield(xai.gradcam, 'feature_layer')
-    gc_title = sprintf('%s — layer "%s"', gc_title, char(xai.gradcam.feature_layer));
+% ── Clinical images (three) ──
+yimg = 0.485; himg = 0.20; wimg = 0.29;
+xs = [0.035 0.355 0.675];
+local_img(fig, im2uint8(canvas), [xs(1) yimg wimg himg], 'Enhanced fundus', ink);
+local_img(fig, annotated,        [xs(2) yimg wimg himg], 'AI findings (lesions marked)', ink);
+atitle = 'AI attention';
+if isfield(xai, 'gradcam') && isfield(xai.gradcam, 'method') && ...
+        xai.gradcam.method == "occlusion-sensitivity"
+    atitle = 'AI attention (where the model looked)';
 end
-title(ax3, gc_title, 'FontSize', 11);
+local_img(fig, attention,        [xs(3) yimg wimg himg], atitle, ink);
 
-% Panel 4: probability bar chart
-ax4 = nexttile(tl);
-local_prob_bar(ax4, g.probs, classes);
+% ── Findings ──
+annotation(fig, 'textbox', [0.035 0.445 0.6 0.02], 'String', 'CLINICAL FINDINGS', ...
+    'Color', mute, 'FontSize', 10, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
+    'VerticalAlignment', 'middle', 'Interpreter', 'none');
 
-% Panel 5+6: text findings, spanning the bottom row
-ax5 = nexttile(tl, [1 2]);
-local_findings_text(ax5, r, g, xai, classes, disclaimer);
+local_findings_card(fig, [0.035 0.235 0.44 0.195], 'Lesions detected', ...
+    local_lesion_summary(r, classes), ink, mute, hair);
+local_findings_card(fig, [0.525 0.235 0.44 0.195], 'AI decision support', ...
+    local_xai_summary(xai, g), ink, mute, hair);
 
-% ─── Export ──────────────────────────────────────────────────────────────
-exportgraphics(fig, out_path, 'ContentType', 'vector', 'BackgroundColor', 'white');
+% ── Recommendation ──
+[rec_text, rec_col] = local_recommendation(r, g);
+annotation(fig, 'rectangle', [0.035 0.130 0.93 0.078], 'FaceColor', rec_col * 0.12 + 0.88, ...
+    'Color', rec_col, 'LineWidth', 1.0);
+annotation(fig, 'textbox', [0.055 0.130 0.90 0.078], 'String', ...
+    ['RECOMMENDATION:  ' rec_text], 'Color', [0.1 0.12 0.16], 'FontSize', 11.5, ...
+    'FontWeight', 'bold', 'EdgeColor', 'none', 'VerticalAlignment', 'middle', 'Interpreter', 'none');
+
+% ── Footer ──
+annotation(fig, 'line', [0.035 0.965], [0.058 0.058], 'Color', hair);
+annotation(fig, 'textbox', [0.035 0.018 0.93 0.035], 'String', ...
+    ['NETRA · National Eye Triage & Retinal Assessment     |     ' char(string(disclaimer))], ...
+    'Color', mute, 'FontSize', 8.5, 'EdgeColor', 'none', 'VerticalAlignment', 'middle', ...
+    'HorizontalAlignment', 'center', 'Interpreter', 'none');
+
+% ─── Export (raster) ─────────────────────────────────────────────────────
+exportgraphics(fig, out_path, 'ContentType', 'image', 'Resolution', 200, ...
+    'BackgroundColor', 'white');
 close(fig);
 end
 
-% ───────────────────────── helpers ──────────────────────────────────────
+% ═══════════════════════════ layout helpers ═════════════════════════════
 
-function s = local_header_line(g, conf)
-ref = "NOT REFERABLE";
-if g.referable
-    ref = "REFERABLE — refer to ophthalmologist";
-end
-s = sprintf('DR Grade %d — %s   |   Confidence %.0f%%   |   %s', ...
-    g.grade, char(string(g.grade_name)), 100 * conf, ref);
-end
-
-function overlay = local_lesion_overlay(canvas, label_map, classes)
-% Blend each lesion class's colour over the fundus at 50%.
-overlay = im2double(canvas);
-if size(overlay, 3) == 1
-    overlay = repmat(overlay, 1, 1, 3);
-end
-for c = classes.lesion_ids
-    mask = label_map == c;
-    if ~any(mask(:)), continue; end
-    color = classes.colors(c, :);
-    for ch = 1:3
-        chan = overlay(:, :, ch);
-        chan(mask) = 0.5 * chan(mask) + 0.5 * color(ch);
-        overlay(:, :, ch) = chan;
+function local_logo_box(fig, root, pos3)
+% Place the NETRA logo (composited over white) as a small square, top-left.
+try
+    lp = fullfile(root, 'app', 'public', 'netra_logo.png');
+    [im, ~, al] = imread(lp);
+    im = im2double(im);
+    if ~isempty(al)
+        a = im2double(al);
+        if size(a, 3) == 1, a = repmat(a, 1, 1, 3); end
+        im = im .* a + (1 - a);              % over white
     end
+    w = pos3(3); x = pos3(1); y = pos3(2);
+    ax = axes(fig, 'Units', 'normalized', 'Position', [x y w w * 1000 / 1414]); %#ok<LAXES>
+    imshow(im, 'Parent', ax);
+catch
 end
-overlay = im2uint8(overlay);
 end
 
-function local_prob_bar(ax, probs, classes) %#ok<INUSD>
-% Horizontal bar of the five ICDR class probabilities.
-icdr = ["No DR", "Mild", "Moderate", "Severe", "PDR"];
+function local_grade_badge(fig, pos, grade, gcol, gtint, mute)
+% A round severity badge: big grade number in the severity colour on a light disc.
+ax = axes(fig, 'Units', 'normalized', 'Position', pos); %#ok<LAXES>
+hold(ax, 'on'); axis(ax, 'off'); xlim(ax, [0 1]); ylim(ax, [0 1]);
+rectangle(ax, 'Position', [0.02 0.02 0.96 0.96], 'Curvature', [1 1], ...
+    'FaceColor', gtint, 'EdgeColor', gcol, 'LineWidth', 2.5);
+text(ax, 0.5, 0.60, sprintf('%d', grade), 'Parent', ax, 'FontSize', 30, ...
+    'FontWeight', 'bold', 'Color', gcol, 'HorizontalAlignment', 'center');
+text(ax, 0.5, 0.24, 'GRADE', 'Parent', ax, 'FontSize', 8.5, 'Color', mute, ...
+    'HorizontalAlignment', 'center');
+end
+
+function local_img(fig, img, pos, ttl, ink)
+ax = axes(fig, 'Units', 'normalized', 'Position', pos); %#ok<LAXES>
+imshow(img, 'Parent', ax, 'Border', 'tight');
+annotation(fig, 'textbox', [pos(1) pos(2)+pos(4)+0.004 pos(3) 0.022], 'String', ttl, ...
+    'Color', ink, 'FontSize', 10, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
+    'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', 'Interpreter', 'none');
+end
+
+function local_prob_strip(ax, probs, sev, ink, mute, hair)
+icdr = ["No DR" "Mild" "Moderate" "Severe" "PDR"];
 n = numel(probs);
-b = barh(ax, 1:n, probs(:), 0.6);
-b.FaceColor = [0.20 0.45 0.85];
-ax.YTick = 1:n;
-ax.YTickLabel = icdr(1:min(n, numel(icdr)));
-ax.XLim = [0 1];
-ax.XLabel.String = 'probability';
-title(ax, 'Grade probabilities', 'FontSize', 11);
-grid(ax, 'on');
-set(ax, 'YDir', 'reverse');
+b = barh(ax, 1:n, probs(:), 0.62, 'FaceColor', 'flat');
+b.CData = sev(1:n, :); b.EdgeColor = 'none';
+for i = 1:n
+    text(ax, min(probs(i) + 0.03, 1.02), i, sprintf('%.0f%%', 100 * probs(i)), ...
+        'Parent', ax, 'Color', ink, 'FontSize', 8.5, 'VerticalAlignment', 'middle');
+end
+set(ax, 'YDir', 'reverse', 'YTick', 1:n, 'YTickLabel', icdr(1:n), 'XLim', [0 1.15], ...
+    'XTick', [], 'FontSize', 8.5, 'YColor', ink, 'XColor', 'none', 'Color', 'w', ...
+    'Box', 'off', 'TickLength', [0 0]);
+title(ax, 'Grade probabilities', 'FontSize', 9.5, 'FontWeight', 'bold', 'Color', mute);
 end
 
-function local_findings_text(ax, r, g, xai, classes, disclaimer)
-% A left-aligned block of clinical findings drawn as text on an empty axes.
-axis(ax, 'off');
+function local_findings_card(fig, pos, ttl, lines, ink, mute, hair) %#ok<INUSD>
+% Card with a bold title and a single auto-wrapping text body, so line spacing is
+% even and tight (one box per line spaced them out unevenly).
+annotation(fig, 'rectangle', pos, 'FaceColor', [0.975 0.982 0.99], 'Color', hair, 'LineWidth', 0.75);
+x = pos(1) + 0.018; y = pos(2); w = pos(3) - 0.036; h = pos(4);
+annotation(fig, 'textbox', [x y+h-0.03 w 0.024], 'String', ttl, 'Color', ink, ...
+    'FontSize', 11, 'FontWeight', 'bold', 'EdgeColor', 'none', 'VerticalAlignment', 'middle', ...
+    'Interpreter', 'none');
+body = strjoin(cellstr(lines(:)), newline);
+annotation(fig, 'textbox', [x y+0.012 w h-0.052], 'String', body, 'Color', ink, ...
+    'FontSize', 10, 'EdgeColor', 'none', 'VerticalAlignment', 'top', 'FitBoxToText', 'off', ...
+    'Interpreter', 'none');
+end
+
+% ═══════════════════════════ content builders ═══════════════════════════
+
+function lines = local_lesion_summary(r, classes)
+% One line per lesion class actually present, plus macular proximity.
 lines = strings(0, 1);
-
-% Quality verdict
-if isfield(xai, 'quality') && ~isempty(xai.quality)
-    q = xai.quality;
-    if isfield(q, 'is_passed') && q.is_passed
-        lines(end+1) = "Quality gate: PASSED (Phase 1).";
-    else
-        codes = '';
-        if isfield(q, 'fail_codes'), codes = strjoin(cellstr(q.fail_codes), ', '); end
-        lines(end+1) = "Quality gate: FAILED — " + string(codes) + ".";
-    end
-else
-    lines(end+1) = "Quality gate: passed (image was graded).";
-end
-
-% Lesion burden per class
-lines(end+1) = "";
-lines(end+1) = "Lesion burden (Phase 3):";
+any_les = false;
 for c = classes.lesion_ids
-    name = strrep(char(classes.names(c)), '_', ' ');
     st = local_class_stat(r, classes, c);
-    lines(end+1) = sprintf("   %-14s  %6d px   %3d region(s)   %.3f%% of retina", ...
-        name, st.pixels, st.regions, 100 * st.area_fraction); %#ok<AGROW>
+    if st.pixels > 0 || st.regions > 0
+        name = strrep(char(classes.names(c)), '_', ' ');
+        name = [upper(name(1)) name(2:end)];
+        if st.regions > 0
+            lines(end+1) = sprintf('%s: %d region(s), %.2f%% of retina', name, st.regions, 100*st.area_fraction); %#ok<AGROW>
+        else
+            lines(end+1) = sprintf('%s: %.2f%% of retina', name, 100*st.area_fraction); %#ok<AGROW>
+        end
+        any_les = true;
+    end
 end
-
-% Fovea proximity in disc diameters
+if ~any_les
+    lines(end+1) = 'No focal lesions segmented.';
+end
 dd = local_nearest_lesion_dd(r);
 if ~isnan(dd)
-    lines(end+1) = "";
-    lines(end+1) = sprintf("Nearest lesion to fovea: %.1f disc diameters.", dd);
+    lines(end+1) = ''; %#ok<AGROW>
     if dd < 1.0
-        lines(end) = lines(end) + "  (macular involvement — sight-threatening)";
+        lines(end+1) = sprintf('Macular involvement: nearest lesion %.1f disc diameters from the fovea - sight-threatening.', dd); %#ok<AGROW>
+    else
+        lines(end+1) = sprintf('Nearest lesion %.1f disc diameters from the fovea.', dd); %#ok<AGROW>
     end
 end
+end
 
-% Attention-lesion alignment
-if isfield(xai, 'iou') && ~isempty(xai.iou)
+function lines = local_xai_summary(xai, g) %#ok<INUSD>
+% NETRA's explainability, in a sentence a clinician can act on.
+lines = strings(0, 1);
+if isfield(xai, 'iou') && ~isempty(xai.iou) && isfield(xai.iou, 'attention_mass_near_lesion')
     a = xai.iou;
-    lines(end+1) = "";
-    lines(end+1) = "Explainability — attention vs lesions (Phase 5):";
-    lines(end+1) = sprintf("   attention mass on lesions: %.1f%%", ...
-        100 * a.attention_mass_on_lesion);
-    lines(end+1) = sprintf("   IoU %.3f   vs control %.3f   (lift %+.3f)", ...
-        a.iou, a.control_iou, a.lift);
+    lines(end+1) = sprintf('Attention on lesion regions: %.0f%% (vs %.0f%% expected by chance).', ...
+        100 * a.attention_mass_near_lesion, 100 * a.control_mass_near); %#ok<AGROW>
+    if isfield(a, 'attention_lesion_corr')
+        lines(end+1) = sprintf('Attention-lesion correlation: %+.2f.', a.attention_lesion_corr); %#ok<AGROW>
+    end
+    lines(end+1) = ''; %#ok<AGROW>
+    if isfield(a, 'mass_lift') && a.mass_lift > 0.05
+        lines(end+1) = 'The grade is supported by pathology the model visibly attended to.'; %#ok<AGROW>
+    else
+        lines(end+1) = 'The model relied on diffuse cues; correlate with the marked lesions.'; %#ok<AGROW>
+    end
+else
+    lines(end+1) = 'Attention map generated; see the AI attention panel above.'; %#ok<AGROW>
 end
-
-% Calibration
 if isfield(xai, 'calibration') && ~isempty(xai.calibration)
-    cal = xai.calibration;
-    lines(end+1) = "";
-    lines(end+1) = sprintf("Confidence calibration: T = %.2f, ECE %.3f -> %.3f.", ...
-        cal.T, cal.ece_before, cal.ece_after);
+    c = xai.calibration;
+    lines(end+1) = ''; %#ok<AGROW>
+    lines(end+1) = sprintf('Confidence calibrated (temperature T = %.2f).', c.T); %#ok<AGROW>
+end
 end
 
-lines(end+1) = "";
-lines(end+1) = "— " + string(disclaimer);
+function [txt, col] = local_recommendation(r, g)
+dd = local_nearest_lesion_dd(r);
+if g.referable
+    col = [0.80 0.13 0.13];
+    txt = 'Refer to an ophthalmologist for confirmation and management.';
+    if ~isnan(dd) && dd < 1.0
+        txt = 'Urgent referral — sight-threatening maculopathy features detected.';
+    end
+else
+    col = [0.16 0.63 0.30];
+    txt = 'No referable DR detected. Routine re-screening advised per protocol.';
+end
+end
 
-text(ax, 0.01, 0.98, lines, 'Units', 'normalized', ...
-    'VerticalAlignment', 'top', 'HorizontalAlignment', 'left', ...
-    'FontName', 'Consolas', 'FontSize', 9, 'Interpreter', 'none');
+% ═══════════════════════════ image builders ═════════════════════════════
+
+function img = local_clinical_overlay(canvas, r, label_map, classes)
+img = im2double(canvas);
+if size(img, 3) == 1, img = repmat(img, 1, 1, 3); end
+if isfield(r, 'vessels') && isstruct(r.vessels) && isfield(r.vessels, 'mask') && ~isempty(r.vessels.mask)
+    img = local_tint(img, r.vessels.mask & (label_map <= 1), [0.0 0.6 0.6], 0.4);
+end
+for c = classes.lesion_ids
+    img = local_tint(img, label_map == c, classes.colors(c, :), 0.55);
+end
+anat_items = struct('color', {}, 'label', {});
+if isfield(r, 'optic_disc') && isstruct(r.optic_disc) && ~isempty(r.optic_disc)
+    od = r.optic_disc;
+    if isfield(od, 'disc_mask') && any(od.disc_mask(:))
+        img = local_tint(img, bwperim(imdilate(od.disc_mask, strel('disk', 2))), [0 1 0], 1);
+        anat_items(end+1) = struct('color', [0 255 0], 'label', 'optic disc'); %#ok<AGROW>
+    end
+    if isfield(od, 'fovea_center') && all(isfinite(od.fovea_center)) && ...
+            isfield(od, 'fovea_radius') && isfinite(od.fovea_radius)
+        [Hh, Ww, ~] = size(img); [X, Y] = meshgrid(1:Ww, 1:Hh);
+        ring = abs(sqrt((X-od.fovea_center(1)).^2 + (Y-od.fovea_center(2)).^2) - od.fovea_radius) < 3;
+        img = local_tint(img, ring, [1 0 1], 1);
+        anat_items(end+1) = struct('color', [255 0 255], 'label', 'fovea'); %#ok<AGROW>
+    end
+end
+img = im2uint8(img);
+if isempty(anat_items), img = overlay_legend(img); else, img = overlay_legend(img, anat_items); end
+end
+
+function img = local_tint(img, mask, color, alpha)
+if ~any(mask(:)), return; end
+for ch = 1:3
+    chan = img(:, :, ch);
+    chan(mask) = (1 - alpha) * chan(mask) + alpha * color(ch);
+    img(:, :, ch) = chan;
+end
+end
+
+function img = local_gradcam_image(canvas, label_map, xai, cfg)
+if ~(isfield(xai, 'gradcam') && isfield(xai.gradcam, 'score_map_canvas'))
+    if isfield(xai, 'gradcam') && isfield(xai.gradcam, 'overlay')
+        img = xai.gradcam.overlay;
+    else
+        img = im2uint8(canvas);
+    end
+    return;
+end
+alpha = local_cfg(cfg, {'explainability', 'overlay_alpha'}, 0.45);
+cmap_name = local_cfg(cfg, {'reporting', 'colormap'}, 'jet');
+valid = label_map > 0;
+heat = double(xai.gradcam.score_map_canvas);
+if ~isequal(size(heat), size(valid)), heat = imresize(heat, size(valid)); end
+heat(~valid) = 0;
+hv = heat(valid);
+if ~isempty(hv) && max(hv) > min(hv), heat = (heat - min(hv)) / (max(hv) - min(hv)); end
+heat(~valid) = 0;
+try, cmap = feval(cmap_name, 256); catch, cmap = jet(256); end %#ok<CTCH>
+idx = min(max(round(heat * 255) + 1, 1), 256);
+heat_rgb = reshape(cmap(idx(:), :), [size(heat, 1), size(heat, 2), 3]);
+base = im2double(canvas);
+if size(base, 3) == 1, base = repmat(base, 1, 1, 3); end
+amap = alpha * double(valid);
+blended = base .* (1 - amap) + heat_rgb .* amap;
+img = im2uint8(min(max(blended, 0), 1));
+end
+
+% ═══════════════════════════ data helpers ═══════════════════════════════
+
+function probs = local_grade_probs(g)
+if isfield(g, 'probabilities') && ~isempty(g.probabilities)
+    probs = g.probabilities;
+elseif isfield(g, 'probs') && ~isempty(g.probs)
+    probs = g.probs;
+else
+    error('NETRA:NoProbabilities', 'Grade result has neither .probabilities nor .probs.');
+end
+probs = double(probs(:))';
+end
+
+function canvas = local_report_canvas(g, xai, options)
+if isfield(g, 'canvas') && ~isempty(g.canvas)
+    canvas = g.canvas;
+elseif isfield(xai, 'gradcam') && isfield(xai.gradcam, 'canvas') && ~isempty(xai.gradcam.canvas)
+    canvas = xai.gradcam.canvas;
+elseif isfield(options, 'Canvas') && ~isempty(options.Canvas)
+    canvas = options.Canvas;
+else
+    error('NETRA:NoCanvas', ...
+        ['No enhanced canvas available. grade_dr_severity returns none; pass the ' ...
+         'Grad-CAM result in xai.gradcam (it carries .canvas) or set options.Canvas.']);
+end
+canvas = im2double(canvas);
 end
 
 function st = local_class_stat(r, classes, c)
-% Pull a class's stats from r.stats regardless of whether it is keyed by name.
 st = struct('pixels', 0, 'regions', 0, 'area_fraction', 0);
 if ~isfield(r, 'stats'), return; end
 name = char(classes.names(c));
@@ -250,56 +423,37 @@ if isfield(r.stats, name)
     st.regions       = local_field(s, {'regions', 'region_count', 'num_regions'}, 0);
     st.area_fraction = local_field(s, {'area_fraction', 'fraction', 'area_frac'}, 0);
 else
-    % Fall back to counting the label map directly.
     st.pixels = nnz(double(r.label_map) == c);
 end
 end
 
 function dd = local_nearest_lesion_dd(r)
-% Distance from the fovea to the nearest lesion pixel, in disc diameters.
 dd = NaN;
 if ~isfield(r, 'optic_disc') || isempty(r.optic_disc), return; end
 od = r.optic_disc;
 if ~isfield(od, 'fovea_center') || any(~isfinite(od.fovea_center)), return; end
-if ~isfield(od, 'disc_radius') || ~isfinite(od.disc_radius) || od.disc_radius <= 0
-    return;
-end
+if ~isfield(od, 'disc_radius') || ~isfinite(od.disc_radius) || od.disc_radius <= 0, return; end
 [yy, xx] = find(double(r.label_map) > 1);
 if isempty(xx), return; end
-fx = od.fovea_center(1); fy = od.fovea_center(2);
-d_px = min(sqrt((xx - fx).^2 + (yy - fy).^2));
+d_px = min(sqrt((xx - od.fovea_center(1)).^2 + (yy - od.fovea_center(2)).^2));
 dd = d_px / (2 * od.disc_radius);
 end
 
 function v = local_field(s, names, default)
 v = default;
 for i = 1:numel(names)
-    if isfield(s, names{i})
-        v = s.(names{i});
-        return;
-    end
+    if isfield(s, names{i}), v = s.(names{i}); return; end
 end
 end
 
 function v = local_opt(options, field, default)
-if isfield(options, field) && ~isempty(options.(field))
-    v = options.(field);
-else
-    v = default;
-end
+if isfield(options, field) && ~isempty(options.(field)), v = options.(field); else, v = default; end
 end
 
 function v = local_cfg(cfg, path, default)
 v = cfg;
 for i = 1:numel(path)
-    if isstruct(v) && isfield(v, path{i})
-        v = v.(path{i});
-    else
-        v = default;
-        return;
-    end
+    if isstruct(v) && isfield(v, path{i}), v = v.(path{i}); else, v = default; return; end
 end
-if isempty(v)
-    v = default;
-end
+if isempty(v), v = default; end
 end
