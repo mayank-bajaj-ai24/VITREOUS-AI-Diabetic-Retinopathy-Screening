@@ -1,77 +1,92 @@
 % DR screening district-capacity model configuration.
-% All numerical values in this file are illustrative placeholders. Replace
-% them with measured operational telemetry before making deployment claims.
+% Defaults are illustrative only. telemetry_measured.mat takes precedence.
 
 cfg = struct();
 cfg.patientsPerDay = 400;
 cfg.campDurationHours = 8;
 cfg.campDurationSeconds = cfg.campDurationHours * 3600;
 cfg.numCameras = 2;
-cfg.acquisitionTime = 45;                 % seconds per capture
-cfg.qualityRejectRate = 0.10;             % placeholder operational rejection rate
-cfg.maxRecaptureAttempts = 2;             % after this many retries, manual follow-up
-% Quality routing is internal to the model: 1=gradable, 2=recapture,
-% 3=ungradable/manual follow-up. These are workflow outcomes, not diagnoses.
-cfg.lightPathLatency = 2;                 % seconds; replace with AI telemetry
-cfg.fullPathLatency = 8;                  % seconds; replace with AI telemetry
-cfg.fullPathProbability = 0.25;           % placeholder fraction needing full AI work
+cfg.acquisitionTime = 45;
+cfg.qualityRejectRate = 0.10;
+cfg.maxRecaptureAttempts = 2;
+cfg.lightPathLatency = 2;
+cfg.fullPathLatency = 8;
+cfg.fullPathProbability = 0.25;
 cfg.numAIDevices = 2;
-cfg.confidenceThreshold = 0.90;           % higher = fewer auto-clears (routing proxy)
+cfg.confidenceThreshold = 0.90;
 cfg.numOphthalmologists = 1;
-cfg.reviewTime = 30;                      % seconds; operational design target
-cfg.imageSizeMB = 8;                      % replace with measured image size
-cfg.bandwidthMbps = 5;                    % replace with measured link capacity
-% Illustrative connectivity schedule: offline for the first 4 camp hours,
-% then online for the remaining 4 hours so a sufficiently fast link can
-% clear the day's local backlog before the next camp. Replace with measured
-% local connectivity windows.
+cfg.reviewTime = 30;
+cfg.imageSizeMB = 8;
+cfg.bandwidthMbps = 5;
 cfg.syncEventIntervals = [4 4] * 3600;
 cfg.annualPatients = 100000;
 cfg.workingDaysPerYear = 250;
 cfg.randomSeed = 2026;
 cfg.bottleneckThreshold = 0.90;
-
-% Derived operational values.
-cfg.meanInterarrivalTime = cfg.campDurationSeconds / cfg.patientsPerDay;
 cfg.cameraQueueCapacity = inf;
 
-% Optional telemetry overrides. Save a struct named telemetry in
-% telemetry.mat, or replace this struct from a CSV-import script.
-telemetry = struct( ...
-    'measuredAcquisitionRate', [], ...
-    'measuredQualityRejectRate', [], ...
-    'measuredLightPathLatency', [], ...
-    'measuredFullPathLatency', [], ...
-    'measuredReviewTime', [], ...
-    'measuredImageSize', [], ...
-    'measuredBandwidth', [], ...
-    'measuredAutoClearRate', []);
+% One-element vectors allow identical sampling expressions in fallback mode.
+cfg.lightPathLatencies = cfg.lightPathLatency;
+cfg.fullPathLatencies = cfg.fullPathLatency;
+cfg.qualityRejected = cfg.qualityRejectRate > 0.5;
+cfg.fullPathRequired = cfg.fullPathProbability > 0.5;
+cfg.confidenceScores = cfg.confidenceThreshold;
+cfg.autoClearOutcomes = true;
+cfg.telemetrySource = "illustrative defaults";
+cfg.usingMeasuredTelemetry = false;
 
-if isfile('telemetry.mat')
-    loaded = load('telemetry.mat');
-    if isfield(loaded, 'telemetry')
-        telemetry = loaded.telemetry;
+modelFolder = fileparts(mfilename('fullpath'));
+telemetryFile = fullfile(modelFolder, 'telemetry_measured.mat');
+if isfile(telemetryFile)
+    loaded = load(telemetryFile, 'telemetry');
+    if ~isfield(loaded, 'telemetry')
+        error('DRCapacity:InvalidTelemetry', '%s does not contain a telemetry struct.', telemetryFile);
+    end
+    telemetry = validate_telemetry_fields(loaded.telemetry);
+    cfg.lightPathLatencies = telemetry.lightPathLatencies;
+    cfg.fullPathLatencies = telemetry.fullPathLatencies;
+    cfg.qualityRejected = telemetry.qualityRejected;
+    cfg.fullPathRequired = telemetry.fullPathRequired;
+    cfg.confidenceScores = telemetry.confidenceScores;
+    cfg.autoClearOutcomes = telemetry.autoClearOutcomes;
+    cfg.qualityRejectRate = mean(cfg.qualityRejected);
+    cfg.lightPathLatency = mean(cfg.lightPathLatencies);
+    cfg.fullPathLatency = mean(cfg.fullPathLatencies);
+    cfg.fullPathProbability = mean(cfg.fullPathRequired);
+    cfg.usingMeasuredTelemetry = true;
+    cfg.telemetrySource = string(telemetry.source);
+else
+    warning('DRCapacity:IllustrativeDefaults', ...
+        'Using illustrative defaults — no measured telemetry found (%s).', telemetryFile);
+end
+cfg.meanInterarrivalTime = cfg.campDurationSeconds / cfg.patientsPerDay;
+
+function telemetry = validate_telemetry_fields(telemetry)
+required = {'lightPathLatencies','fullPathLatencies','qualityRejected', ...
+    'fullPathRequired','confidenceScores','autoClearOutcomes'};
+for index = 1:numel(required)
+    field = required{index};
+    if ~isfield(telemetry, field) || isempty(telemetry.(field))
+        error('DRCapacity:InvalidTelemetry', 'Missing nonempty telemetry field: %s.', field);
     end
 end
+telemetry.lightPathLatencies = validate_positive(telemetry.lightPathLatencies, 'lightPathLatencies');
+telemetry.fullPathLatencies = validate_positive(telemetry.fullPathLatencies, 'fullPathLatencies');
+telemetry.qualityRejected = logical(telemetry.qualityRejected(:));
+telemetry.fullPathRequired = logical(telemetry.fullPathRequired(:));
+telemetry.confidenceScores = double(telemetry.confidenceScores(:));
+telemetry.autoClearOutcomes = logical(telemetry.autoClearOutcomes(:));
+if any(~isfinite(telemetry.confidenceScores) | telemetry.confidenceScores < 0 | telemetry.confidenceScores > 1)
+    error('DRCapacity:InvalidTelemetry', 'confidenceScores must be finite values from 0 through 1.');
+end
+if ~isfield(telemetry, 'source') || strlength(string(telemetry.source)) == 0
+    telemetry.source = 'telemetry_measured.mat';
+end
+end
 
-if ~isempty(telemetry.measuredAcquisitionRate)
-    cfg.acquisitionTime = 1 / telemetry.measuredAcquisitionRate;
+function values = validate_positive(values, field)
+values = double(values(:));
+if any(~isfinite(values) | values <= 0)
+    error('DRCapacity:InvalidTelemetry', '%s must contain finite, positive seconds.', field);
 end
-if ~isempty(telemetry.measuredQualityRejectRate)
-    cfg.qualityRejectRate = telemetry.measuredQualityRejectRate;
-end
-if ~isempty(telemetry.measuredLightPathLatency)
-    cfg.lightPathLatency = telemetry.measuredLightPathLatency;
-end
-if ~isempty(telemetry.measuredFullPathLatency)
-    cfg.fullPathLatency = telemetry.measuredFullPathLatency;
-end
-if ~isempty(telemetry.measuredReviewTime)
-    cfg.reviewTime = telemetry.measuredReviewTime;
-end
-if ~isempty(telemetry.measuredImageSize)
-    cfg.imageSizeMB = telemetry.measuredImageSize;
-end
-if ~isempty(telemetry.measuredBandwidth)
-    cfg.bandwidthMbps = telemetry.measuredBandwidth;
 end

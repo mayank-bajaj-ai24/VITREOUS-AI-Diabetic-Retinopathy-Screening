@@ -5,8 +5,12 @@ This SimEvents model is an **operational capacity model** for screening logistic
 ## Run
 
 1. Open MATLAB in this folder.
-2. Replace illustrative values in `config.m` with measured operational telemetry when available.
-3. Run `run_simulation`.
+2. If real pipeline telemetry is available, run
+   `generate_telemetry('pipeline_results.csv')`, followed by
+   `validate_telemetry`. Otherwise, `config.m` prints an explicit illustrative-
+   defaults warning.
+3. Run `run_simulation`. It installs the telemetry-sampling model configuration,
+   loads `telemetry_measured.mat` when available, and runs the experiments.
 4. Run `dashboard` to open the saved visual summary.
 
 ## Flow
@@ -17,7 +21,32 @@ Failed quality cases return to the camera until `maxRecaptureAttempts`; then the
 
 ## Inputs
 
-All placeholders are in `config.m`: daily demand, camera/AI/ophthalmologist counts, acquisition and AI latency, quality rejection, review time, image size, bandwidth, connectivity window, and random seed. `telemetry.mat` can override fields using a `telemetry` struct.
+`config.m` contains the illustrative fallback: daily demand, resource counts,
+acquisition/review time, image size, bandwidth, connectivity window, and seed.
+Measured per-image telemetry belongs in `telemetry_measured.mat`, which always
+takes precedence when present.
+
+## Regenerate telemetry from the real pipeline
+
+The model is intentionally two-phase: run the image pipeline over a batch first,
+then have SimEvents bootstrap-sample those observed per-image values. It does not
+run neural networks inside the discrete-event loop.
+
+1. Add per-image instrumentation to the pipeline: `qualityPassed`, `tic/toc`
+   timings around light and full inference, `confidenceScore`, and `autoClear`.
+   Set `fullPathLatencySeconds` to `NaN` if full inference was skipped.
+2. Save those measurements as a table in CSV/MAT form, with the exact column
+   names above. For example: `generate_telemetry('pipeline_results.csv')`.
+   Alternatively, call `generate_telemetry(imageFolder,'PipelineFcn',@myPipeline)`;
+   the function must return that scalar measurement struct for each image.
+3. Run `validate_telemetry` and inspect its light-path latency histogram and
+   printed reject/auto-clear rates.
+4. Run `apply_data_driven_telemetry` once to update and save the `.slx`, then
+   run `run_simulation`. `config.m` automatically loads `telemetry_measured.mat`.
+
+If `telemetry_measured.mat` is absent, the model emits **“Using illustrative
+defaults — no measured telemetry found”** and uses the documented fallback
+scalars. Treat results from that mode as illustrative, not measured.
 
 ## Outputs
 
