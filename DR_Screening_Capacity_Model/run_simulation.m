@@ -1,5 +1,8 @@
 %RUN_SIMULATION Single entry point for baseline, AI comparison and Step 7.
 config;
+% Idempotently install telemetry sampling before any SimEvents run.
+apply_data_driven_telemetry;
+config;
 if ~isfolder('results'), mkdir('results'); end
 baselineData = calculate_metrics(simulate_capacity_scenario(cfg),cfg);
 run_ai_comparison; aiData = results;
