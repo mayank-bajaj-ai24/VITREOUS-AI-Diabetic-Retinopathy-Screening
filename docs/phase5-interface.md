@@ -1,95 +1,93 @@
-# Phase 5 ⇄ Phase 4 Interface Contract
+# Phase 5 ⇄ Phase 4 Interface — Reconciled
 
 **Owner:** Kathan (Phase 5 — Explainability)
-**Audience:** whoever builds Phase 4 (DR severity grading)
-
-Phase 5's explainability tools (Grad-CAM, attention–lesion IoU, temperature
-scaling, PDF report) all consume the output of Phase 4's grading model. Phase 4
-is not built yet, so Phase 5 is developed against a **development stub**
-(`matlab/explainability/dev/`) that mimics this contract. When Phase 4 lands,
-matching this contract makes the swap a one-line change and no Phase 5 code has
-to move.
-
-The Phase 5 functions are written to take **plain arrays and a network handle**,
-never Phase 4 internals, so a mismatch here degrades gracefully rather than
-breaking. This document records the small number of things Phase 5 genuinely
-needs.
+**Status:** Phase 4 (`matlab/classification/`) has landed. This records how the
+delivered interface differs from the contract Phase 5 was drafted against, and
+how Phase 5 adapts. Everything below is what the code now does.
 
 ---
 
-## 1. What `grade_dr_severity` should return
+## 1. What `grade_dr_severity` actually returns
 
-Phase 4's inference entry point is `grade_dr_severity(image_input, net, cfg, options)`.
-Phase 5 needs these fields on the returned struct `g`:
+`result = grade_dr_severity(image_input, model, cfg, options)` returns:
 
-| Field | Type | Meaning | Used by |
-|---|---|---|---|
-| `g.grade` | integer 0–4 | ICDR severity (argmax) | report |
-| `g.grade_name` | string | e.g. `"Moderate NPDR"` | report |
-| `g.probs` | 1×5 double | softmax probabilities, sum to 1 | report, calibration |
-| `g.logits` | 1×5 double | **pre-softmax** scores | temperature scaling |
-| `g.confidence` | scalar | `max(g.probs)` | report |
-| `g.referable` | logical | `g.grade >= 2` | report, SimEvents |
-| `g.canvas` | 512×512×3 | the enhanced image actually fed to the net | Grad-CAM, IoU |
-| `g.gradcam_layer` | string | name of the conv layer to explain (see §3) | Grad-CAM |
+| Field | Type | Notes |
+|---|---|---|
+| `.grade` | int 0–4 | ICDR grade |
+| `.grade_name` | char | e.g. `"Moderate NPDR"` |
+| `.probabilities` | 1×5 double | **softmax probabilities** — note the name is `probabilities`, not `probs` |
+| `.confidence` | scalar | `max(probabilities)` (raw, unless a Temperature was given) |
+| `.referable` | logical | grade ≥ 2 |
+| `.mode` | char | `'frozen'` or `'end-to-end'` |
+| `.quality` | struct | the Phase 1 report (empty if `options.Enhanced`) |
 
-The single most important one is **`g.logits`**. Temperature scaling operates on
-raw logits; if Phase 4 only returns softmax probabilities, calibration cannot be
-done correctly. Keep the pre-softmax scores.
+It also accepts `options.Temperature` — it divides logits by that before softmax,
+**exactly the hook Phase 5's calibration needs at inference.** Aadi added this
+deliberately for us.
 
-`g.canvas` matters because Grad-CAM attention has to be compared against Phase
-3's lesion masks, and both must live on the **same 512×512 canvas** (see the
-implementation plan, "For attention-lesion IoU"). If Phase 4 internally resizes
-to 224 (ResNet) or 380 (EfficientNet), that is fine — return the 512 canvas here
-and Phase 5 upsamples the coarse Grad-CAM map back onto it.
+### Differences from the drafted contract, and how Phase 5 adapts
 
----
+| Drafted contract expected | Reality | Phase 5's adaptation |
+|---|---|---|
+| `.probs` | `.probabilities` | `generate_pdf_report` accepts **either** (`local_grade_probs`). |
+| `.logits` returned | not returned; net ends in softmax | Recover logits as **`log(probabilities)`** — equal to true logits up to a per-sample constant that softmax cancels, so temperature fitting is identical. See `collect_grading_logits`. |
+| `.canvas` returned | not returned | The report resolves the 512 canvas from **`xai.gradcam.canvas`** (`generate_gradcam` returns it), or `options.Canvas`. |
+| `.gradcam_layer` returned | not returned | `generate_gradcam` auto-detects the last conv (now recursing into the nested backbone branches) and warns; or set `explainability.feature_layer`. |
 
-## 2. What Phase 4 should save for calibration
+## 2. Calibration path (no change needed to Phase 4)
 
-Temperature scaling is fit on a **held-out split the model never trained on**
-(plan, Phase 5 Step 3). Phase 4 should save, from that split:
-
-```
-data/processed/grading/heldout_calibration.mat
-    logits   % N×5 double, pre-softmax
-    labels   % N×1, ICDR grade 0–4 (or 1–5; temperature_scaling detects both)
+```matlab
+[lg, lb] = collect_grading_logits(heldout_paths, heldout_grades, model, cfg);
+cal = temperature_scaling(lg, lb, cfg);                 % fit T on held-out
+% at inference, apply it through Phase 4's own hook:
+g = grade_dr_severity(img, model, cfg, struct('Temperature', cal.T));
 ```
 
-`temperature_scaling.m` takes these two arrays directly. It does not care how
-they were produced.
+`collect_grading_logits` runs `grade_dr_severity` per held-out image and stacks
+`log(probabilities)` into the logit matrix `temperature_scaling` consumes.
+
+To wire the demo to a real calibration set, save either
+`data/processed/grading/heldout_calibration.mat` with `logits` (N×5) + `labels`
+(N), or with `images` (paths) + `grades` (0–4); the demo picks it up
+automatically. Without it, the demo uses a synthetic overconfident set purely to
+show the mechanics.
+
+## 3. Grad-CAM on the hybrid — the one open item
+
+The grading model (`build_hybrid_model`) wraps each backbone in a `networkLayer`
+(`resnet`, `effnet`), so its convolution layers are **nested**, not on the
+top-level graph. Running the real model **confirmed that `gradCAM` cannot address
+a convolution nested inside a `networkLayer`** — it fails with "Layer … does not
+exist" for any spelling of the nested name.
+
+**Resolution: `generate_gradcam` falls back to occlusion sensitivity.** It tries
+Grad-CAM first (works on a flat network), and on failure computes an
+`occlusionSensitivity` map instead — a model-agnostic attention method that only
+calls `predict`, so nesting is no obstacle. The map is consumed identically by
+the attention-IoU, the overlay and the report (which labels the panel by method).
+It is deliberately coarse (large patch/stride) for speed on CPU. Tunable via
+`explainability.occlusion_mask` / `occlusion_stride`.
+
+Grad-CAM/occlusion applies only to the **end-to-end** model. On a
+**frozen-feature** model the head is trained on pooled vectors with no spatial
+map, so the demo skips attention (and the attention-IoU) in that mode.
+
+## 4. The development stub — now a fallback, not scaffolding
+
+`matlab/explainability/dev/` (`make_stub_grading_net`, `stub_grade_dr_severity`)
+stays, but its role has changed: it is the **fallback** the demo and tests use
+when no trained grading model is present, so the Phase 5 pipeline still runs end
+to end on any clone. When a trained model is in `data/processed/models/`, the
+demo uses it instead automatically. Keep the stub until the trained model ships
+with the repo (or a download step exists); it is what makes the tests hermetic.
 
 ---
 
-## 3. The Grad-CAM feature layer
+## What we still need from the Phase 4 side
 
-Grad-CAM needs the name of a **late convolution layer** to read attention from.
-For the two-branch hybrid model this is a real choice, and the report must state
-which branch is being explained (plan, Phase 5 Step 1).
-
-Phase 4 should expose the chosen layer name as `g.gradcam_layer`, or set it in
-config at `explainability.feature_layer`. If neither is set, `generate_gradcam`
-auto-detects the last convolution layer and warns.
-
-Recommended: explain the branch whose features dominate the fused head, or run it
-on both and report both. Decide deliberately, do not let auto-detect pick
-silently for the final report.
-
----
-
-## 4. The development stub (delete when Phase 4 is real)
-
-Until Phase 4 exists, these stand in for it. They are **untrained random-weight
-networks** — correct in shape, meaningless in prediction. They exist only to
-exercise the Phase 5 code paths and tests end to end.
-
-- `matlab/explainability/dev/make_stub_grading_net.m` — a small 5-class
-  `dlnetwork` with a named feature layer `"features"`, logit layer `"logits"`,
-  and `"softmax"`, input `512×512×3`.
-- `matlab/explainability/dev/stub_grade_dr_severity.m` — wraps that net to return
-  the §1 contract struct.
-
-When Phase 4 delivers `grade_dr_severity`, replace calls to
-`stub_grade_dr_severity` with `grade_dr_severity`, point the model loader at the
-real grading `.mat`, and delete the `dev/` folder. No other Phase 5 change is
-required.
+- **The trained model file** (`dr_grading_hires.mat`) committed or otherwise
+  fetchable, so Grad-CAM, attention-IoU and calibration run on real predictions
+  rather than the stub. This is the single blocker to fully validating Phase 5
+  against real output.
+- Optionally, a saved **held-out calibration set** (§2) so temperature scaling
+  is fitted on real data.

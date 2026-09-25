@@ -103,6 +103,34 @@ else
     attention_mass_on_lesion = 0;
 end
 
+% ─── Resolution-fair measures ────────────────────────────────────────────
+% Attention from a late layer (or a coarse occlusion patch) cannot tile a
+% 4-pixel microaneurysm, so exact-pixel IoU understates a map that clearly sits
+% in the right place. Two fairer measures on the same canvas:
+%
+%   near-lesion mass: attention falling within a tolerance zone around lesions
+%                     (the neighbourhood the coarse map can actually resolve).
+%   density corr:     correlation between the attention map and a smoothed lesion
+%                     density -- does the model attend more where lesions cluster?
+tol = local_setting(options, 'TolerancePx', cfg, ...
+    {'explainability', 'attention_tolerance_px'}, max(8, round(0.05 * size(att, 1))));
+
+lesion_zone = imdilate(lesion_mask, strel('disk', tol)) & valid_mask;
+if total_mass > 0
+    attention_mass_near_lesion = sum(att(lesion_zone)) / total_mass;
+else
+    attention_mass_near_lesion = 0;
+end
+
+density = imgaussfilt(double(lesion_mask), tol);   % lesion density at the map scale
+av = att(valid_mask);
+dv = density(valid_mask);
+if std(av) > 0 && std(dv) > 0
+    attention_lesion_corr = corr(av(:), dv(:));
+else
+    attention_lesion_corr = 0;
+end
+
 % ─── Control (null baseline) ─────────────────────────────────────────────
 if isfield(options, 'ControlMask') && ~isempty(options.ControlMask)
     control = logical(options.ControlMask);
@@ -113,6 +141,13 @@ else
     control = rot90(lesion_mask, 2);        % 180° rotation, same area, wrong place
 end
 control_iou = local_iou(hot, control & valid_mask);
+% Same near-lesion mass for the control, so the fair measure has a baseline too.
+control_zone = imdilate(control & valid_mask, strel('disk', tol)) & valid_mask;
+if total_mass > 0
+    control_mass_near = sum(att(control_zone)) / total_mass;
+else
+    control_mass_near = 0;
+end
 
 % ─── Per-class breakdown ─────────────────────────────────────────────────
 classes = lesion_classes();
@@ -135,6 +170,11 @@ per_class = table(class_name, mass_frac, class_iou, ...
 result = struct();
 result.iou                     = iou;
 result.attention_mass_on_lesion = attention_mass_on_lesion;
+result.attention_mass_near_lesion = attention_mass_near_lesion;
+result.control_mass_near       = control_mass_near;
+result.mass_lift               = attention_mass_near_lesion - control_mass_near;
+result.attention_lesion_corr   = attention_lesion_corr;
+result.tolerance_px            = tol;
 result.control_iou             = control_iou;
 result.lift                    = iou - control_iou;
 result.threshold               = threshold;

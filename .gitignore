@@ -240,3 +240,11 @@ data/sample_images/walkthrough/
 
 # NETRA: model snapshots and comparison output
 data/sample_images/comparison/
+
+# Node / Frontend
+node_modules/
+app/node_modules/
+dist/
+app/dist/
+.vite/
+
