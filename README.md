@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  SIH 2026 · Problem Statement 26038 · MedTech / HealthTech · Team ByteCrew (Team ID 24)
+  SIH 2026 · Problem Statement 26038 · MedTech / HealthTech · Team ByteCreww (Team ID 122665)
 </p>
 
 ---
@@ -26,7 +26,7 @@ Raw Fundus Image
   → MATLAB Quality-Adaptive Enhancement (CLAHE, denoising, standardization)
   → Parallel Dual-Track MATLAB AI:
        Track A: UNet++ Lesion Segmentation
-       Track B: EfficientNet-B4 + ResNet-50 Hybrid Grading
+       Track B: EfficientNet-B0 + ResNet-50 Hybrid Grading
   → MATLAB XAI & Calibration (Grad-CAM / occlusion attention, Temperature Scaling)
   → Clinical Decision Support → NETRA PDF Report
 ```
@@ -159,7 +159,7 @@ walkthrough of the module lives in
 
 ## Team
 
-**Team ByteCrew** — Team ID 24
+**Team ByteCreww** — Team ID 122665
 
 ## License
 
