@@ -213,6 +213,18 @@ verifyTrue(testCase, all(isfinite(sc.score_map_canvas(:))));
 verifyEqual(testCase, sc.method, "score-cam");
 end
 
+function testScoreCAMBatchSizeInvariant(testCase)
+% A batch as large as the class count (5) must not transpose the scores: the
+% map has to match the one from a different batch size.
+local_assume_dlt(testCase);
+cfg = testCase.TestData.cfg;
+net = make_stub_grading_net(cfg);
+img = local_sample_image(testCase);
+a = generate_scorecam(net, img, cfg, struct('MaxChannels', 10, 'BatchSize', dr_classes().num_classes));
+b = generate_scorecam(net, img, cfg, struct('MaxChannels', 10, 'BatchSize', 8));
+verifyEqual(testCase, a.score_map, b.score_map, 'AbsTol', 1e-4);
+end
+
 % ───────────────────────── fixtures & helpers ─────────────────────────────
 
 function [logits, labels] = local_overconfident(N, C)

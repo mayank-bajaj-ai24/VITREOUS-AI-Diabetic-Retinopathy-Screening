@@ -89,8 +89,7 @@ for s = 1:bs:n_keep
         m = local_norm01(m);
         batch(:, :, :, j) = X .* m;             % soft-mask the image
     end
-    p = local_predict(net, batch);              % numel(idx) x C  (or C x B)
-    p = local_asrows(p, numel(idx));
+    p = local_predict(net, batch);              % numel(idx) x C
     w(idx) = p(:, class_idx);
 end
 
@@ -169,19 +168,19 @@ end
 end
 
 function scores = local_predict(net, X)
-% Forward pass; returns rows-of-scores. Accepts a single HxWx3 or a batch
-% HxWx3xB. Robust to predict returning C x B.
-if ndims(X) == 3, fmt = 'SSCB'; else, fmt = 'SSCB'; end
-y = predict(net, dlarray(single(X), fmt));
+% Forward pass; returns a B x C matrix of scores (1 x C for a single image).
+% Orientation comes from the output's dimension labels, not its sizes, so a
+% batch whose size equals the class count is never transposed by mistake.
+y = predict(net, dlarray(single(X), 'SSCB'));
+c_dim = finddim(y, 'C');
+b_dim = finddim(y, 'B');
 y = double(gather(extractdata(y)));
-scores = y;   % caller normalises orientation
-if isvector(scores), scores = scores(:).'; end
+if isempty(b_dim)
+    scores = reshape(y, 1, []);
+else
+    scores = permute(y, [b_dim c_dim setdiff(1:ndims(y), [b_dim c_dim])]);
+    scores = reshape(scores, size(y, b_dim), size(y, c_dim));
 end
-
-function P = local_asrows(p, n)
-% Return an n x C matrix regardless of whether predict gave C x n or n x C.
-if isvector(p), P = p(:).'; return; end
-if size(p, 1) == n, P = p; elseif size(p, 2) == n, P = p.'; else, P = p; end
 end
 
 function canvas = local_prepare_canvas(image_input, cfg, enhanced)
