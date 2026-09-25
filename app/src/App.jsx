@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const LOGO = '/netra_logo.png';
+const LOGO = '/vitreous_logo.png';
 import { 
   Eye, LayoutDashboard, MonitorPlay, MessageSquare, Activity, Settings,
   Bell, Plus, Users, Upload, Wifi, Stethoscope, ArrowRight, ChevronRight,
@@ -67,8 +67,8 @@ function Landing({ onLogin }) {
       <nav className={`l-nav ${navSolid ? 'solid' : ''}`}>
         <div className="l-nav-inner">
           <div className="l-logo">
-            <img src={LOGO} alt="NETRA" className="logo-img" />
-            <span>NETRA</span>
+            <img src={LOGO} alt="VITREOUS" className="logo-img" />
+            <span>VITREOUS</span>
           </div>
           <div className="l-nav-links">
             <a href="#problem">The Problem</a>
@@ -150,7 +150,7 @@ function Landing({ onLogin }) {
       <section className="l-section dark" id="solution">
         <div ref={s2Ref} className={`l-section-inner fade-section ${s2Vis ? 'visible' : ''}`}>
           <div className="section-label light">OUR SOLUTION</div>
-          <h2 className="white">NETRA sees what<br/>the human eye misses.</h2>
+          <h2 className="white">VITREOUS sees what<br/>the human eye misses.</h2>
           <p className="section-desc light">
             National Eye Triage & Retinal Assessment — a quality-gated, explainable AI system
             that grades diabetic retinopathy severity from a single fundus photograph in under 2 minutes.
@@ -208,7 +208,7 @@ function Landing({ onLogin }) {
               <div className="step-num">01</div>
               <div className="step-content">
                 <h3>Capture & Validate</h3>
-                <p>A health worker captures a fundus image using a portable camera. NETRA's quality 
+                <p>A health worker captures a fundus image using a portable camera. VITREOUS's quality 
                   gate instantly checks sharpness, exposure, and field of view — asking for a retake 
                   if the image isn't diagnostic-ready.</p>
               </div>
@@ -243,7 +243,7 @@ function Landing({ onLogin }) {
           <div className="section-label light">RETINAL INTELLIGENCE</div>
           <h2 className="white">See the AI in action.</h2>
           <p className="section-desc light">
-            Watch how NETRA processes a fundus image — from quality validation through lesion 
+            Watch how VITREOUS processes a fundus image — from quality validation through lesion 
             segmentation to the final explainable report.
           </p>
           <div className="video-showcase">
@@ -288,7 +288,7 @@ function Landing({ onLogin }) {
         <div ref={s6Ref} className={`l-section-inner fade-section ${s6Vis ? 'visible' : ''}`}>
           <h2>Every scan could save someone's sight.</h2>
           <p className="section-desc">
-            NETRA is built by Team ByteCrew for Smart India Hackathon 2026.
+            VITREOUS is built by Team ByteCrew for Smart India Hackathon 2026.
           </p>
           <button className="btn-cta large" onClick={onLogin}>
             Open the Dashboard <ArrowRight size={20} />
@@ -301,8 +301,8 @@ function Landing({ onLogin }) {
         <div className="l-footer-inner">
           <div className="footer-brand">
             <div className="l-logo">
-              <img src={LOGO} alt="NETRA" className="logo-img" />
-              <span>NETRA</span>
+              <img src={LOGO} alt="VITREOUS" className="logo-img" />
+              <span>VITREOUS</span>
             </div>
             <p>National Eye Triage & Retinal Assessment</p>
           </div>
@@ -331,7 +331,7 @@ function Landing({ onLogin }) {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© 2026 NETRA — Team ByteCrew. Built for Smart India Hackathon.</span>
+          <span>© 2026 VITREOUS — Team ByteCrew. Built for Smart India Hackathon.</span>
           <span>Problem Statement SIH26038 · MedTech / HealthTech</span>
         </div>
       </footer>
@@ -351,7 +351,7 @@ function Dashboard({ onLogout }) {
     <div className="app-container">
       <div className="sidebar">
         <div className="sidebar-header" onClick={onLogout} style={{cursor: 'pointer'}} title="Back to landing page">
-          <img src={LOGO} alt="NETRA" className="sidebar-logo-img" /><span>NETRA</span>
+          <img src={LOGO} alt="VITREOUS" className="sidebar-logo-img" /><span>VITREOUS</span>
         </div>
         <div className="clinic-selector">
           <div className="clinic-icon"><Activity size={20} /></div>

@@ -1,7 +1,7 @@
-function p = netra_model_path()
-% NETRA_MODEL_PATH  Locate the lesion segmentation model to use
+function p = vitreous_model_path()
+% VITREOUS_MODEL_PATH  Locate the lesion segmentation model to use
 %
-%   p = netra_model_path()
+%   p = vitreous_model_path()
 %
 %   Returns the path to the best available trained model, or '' if none is
 %   present. Searched in order:

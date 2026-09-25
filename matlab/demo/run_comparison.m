@@ -31,7 +31,7 @@ for i = 1:length(img_files)
     img_raw = imread(raw_path);
     img_enh = imread(enh_path);
     
-    figure('Name', sprintf('NETRA Comparison: %s', raw_name), 'NumberTitle', 'off');
+    figure('Name', sprintf('VITREOUS Comparison: %s', raw_name), 'NumberTitle', 'off');
     
     subplot(1, 2, 1);
     imshow(img_raw);
@@ -39,5 +39,5 @@ for i = 1:length(img_files)
     
     subplot(1, 2, 2);
     imshow(img_enh);
-    title(sprintf('AFTER (NETRA MATLAB Enhanced 512x512)', raw_name), 'FontSize', 12, 'FontWeight', 'bold', 'Color', [0 0.5 0]);
+    title(sprintf('AFTER (VITREOUS MATLAB Enhanced 512x512)', raw_name), 'FontSize', 12, 'FontWeight', 'bold', 'Color', [0 0.5 0]);
 end

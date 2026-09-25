@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="app/public/netra_logo.png" alt="NETRA Logo" width="140"/>
+  <img src="app/public/vitreous_logo.png" alt="VITREOUS Logo" width="140"/>
 </p>
 
-# NETRA — National Eye Triage & Retinal Assessment
+# VITREOUS — National Eye Triage & Retinal Assessment
 
 <p align="center">
   <strong>MATLAB-Based Explainable AI for Diabetic Retinopathy Screening in Rural India</strong>
@@ -14,9 +14,9 @@
 
 ---
 
-## What is NETRA?
+## What is VITREOUS?
 
-NETRA is a quality-gated, explainable AI Clinical Decision Support System (CDSS) for Diabetic Retinopathy (DR) screening. Built as a **100% MATLAB pipeline** for MATLAB R2026a, it grades DR severity (ICDR 0–4) from fundus photographs through a parallel dual-track deep learning pipeline — validated with a MATLAB SimEvents discrete-event simulation to confirm real-world scalability in rural Primary Health Centres (PHCs).
+VITREOUS is a quality-gated, explainable AI Clinical Decision Support System (CDSS) for Diabetic Retinopathy (DR) screening. Built as a **100% MATLAB pipeline** for MATLAB R2026a, it grades DR severity (ICDR 0–4) from fundus photographs through a parallel dual-track deep learning pipeline — validated with a MATLAB SimEvents discrete-event simulation to confirm real-world scalability in rural Primary Health Centres (PHCs).
 
 ## Pipeline Architecture
 
@@ -28,7 +28,7 @@ Raw Fundus Image
        Track A: UNet++ Lesion Segmentation
        Track B: EfficientNet-B0 + ResNet-50 Hybrid Grading
   → MATLAB XAI & Calibration (Grad-CAM / occlusion attention, Temperature Scaling)
-  → Clinical Decision Support → NETRA PDF Report
+  → Clinical Decision Support → VITREOUS PDF Report
 ```
 
 ## Tech Stack & MATLAB Toolboxes
@@ -40,12 +40,12 @@ Raw Fundus Image
 | **Deep Learning** | Deep Learning Toolbox (`trainNetwork`, `semanticseg`, `gradcam`, `importONNXNetwork`) |
 | **Statistics** | Statistics and Machine Learning Toolbox (`var`, `median`, `entropy`) |
 | **Simulation** | Simulink & SimEvents (Discrete-event clinic workflow simulation) |
-| **UI Application** | MATLAB App Designer (`NETRA_App.mlapp`) |
+| **UI Application** | MATLAB App Designer (`VITREOUS_App.mlapp`) |
 
 ## Project Structure
 
 ```
-NETRA/
+VITREOUS/
 ├── matlab/
 │   ├── config/           # YAML config loader (load_config.m) [DONE ✅]
 │   ├── quality/          # Phase 1: Quality Gate Module [DONE ✅]
@@ -170,7 +170,7 @@ report a doctor can read.
 - **Confidence calibration** — temperature scaling recalibrates the softmax so
   the reported confidence is trustworthy, reporting Expected Calibration Error
   before and after.
-- **Clinical PDF report** — a branded single-page NETRA report: severity grade,
+- **Clinical PDF report** — a branded single-page VITREOUS report: severity grade,
   referral decision, the enhanced fundus, annotated lesions, the AI attention
   map, concise findings and a recommendation.
 

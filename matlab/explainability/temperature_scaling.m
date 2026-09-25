@@ -62,14 +62,14 @@ num_bins = local_setting(options, 'NumBins', cfg, {'calibration', 'ece_bins'},  
 
 % ─── Validate and normalise inputs ───────────────────────────────────────
 if ndims(logits) ~= 2 || isempty(logits)
-    error('NETRA:BadLogits', 'logits must be a non-empty N×C matrix.');
+    error('VITREOUS:BadLogits', 'logits must be a non-empty N×C matrix.');
 end
 [N, C] = size(logits);
 
 labels = local_normalise_labels(labels, C, N);   % -> N×1 in 1..C
 
 if ~all(isfinite(logits(:)))
-    error('NETRA:BadLogits', 'logits contains non-finite values.');
+    error('VITREOUS:BadLogits', 'logits contains non-finite values.');
 end
 
 % Linear indices of the true class in each row, for gathering its probability.
@@ -155,11 +155,11 @@ if iscategorical(labels)
 end
 labels = double(labels(:));
 if numel(labels) ~= N
-    error('NETRA:LabelCount', ...
+    error('VITREOUS:LabelCount', ...
         'labels has %d entries but logits has %d rows.', numel(labels), N);
 end
 if any(mod(labels, 1) ~= 0)
-    error('NETRA:BadLabels', 'labels must be integer class values.');
+    error('VITREOUS:BadLabels', 'labels must be integer class values.');
 end
 
 lo = min(labels); hi = max(labels);
@@ -168,7 +168,7 @@ if lo >= 1 && hi <= C
 elseif lo >= 0 && hi <= C - 1
     labels = labels + 1;                % 0-based ICDR -> 1-based
 else
-    error('NETRA:LabelRange', ...
+    error('VITREOUS:LabelRange', ...
         ['labels span %g..%g, which fits neither 0..%d nor 1..%d for %d ' ...
          'classes. Check the label encoding.'], lo, hi, C - 1, C, C);
 end

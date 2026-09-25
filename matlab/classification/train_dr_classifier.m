@@ -143,7 +143,7 @@ for s = 1:n_stages
     val   = load_split(stage_dir, 'val');
     fprintf('  %d train, %d val images\n', numel(train.files), numel(val.files));
     if isempty(train.files)
-        error('NETRA:NoTrainImages', ...
+        error('VITREOUS:NoTrainImages', ...
             'No training images in %s. Run prepare_grading_dataset first.', stage_dir);
     end
 
@@ -393,7 +393,7 @@ switch lower(mode)
     case 'inverse-sqrt'
         w = (1 ./ freq).^0.5;
     otherwise
-        error('NETRA:BadClassWeightMode', ...
+        error('VITREOUS:BadClassWeightMode', ...
             'Unknown ClassWeightMode "%s".', mode);
 end
 % A grade absent from this stage's training data gets no signal to weight; set
@@ -410,7 +410,7 @@ function split = load_split(data_dir, split_name)
 %   parsing file names. Falls back to an error if the manifest is missing.
 manifest_path = fullfile(data_dir, 'manifest.mat');
 if ~isfile(manifest_path)
-    error('NETRA:ManifestMissing', ...
+    error('VITREOUS:ManifestMissing', ...
         'No manifest at %s. Run prepare_grading_dataset first.', manifest_path);
 end
 L = load(manifest_path);

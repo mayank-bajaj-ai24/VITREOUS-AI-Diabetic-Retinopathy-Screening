@@ -44,7 +44,7 @@ if nargin < 1 || isempty(specs)
 end
 
 if numel(specs) < 2
-    error('NETRA:NeedTwoModels', ...
+    error('VITREOUS:NeedTwoModels', ...
         ['Need at least two models to compare; found %d. Save a copy of the ' ...
          'current model into data/processed/models before retraining.'], numel(specs));
 end
@@ -54,13 +54,13 @@ classes = lesion_classes();
 
 manifest_path = fullfile(data_dir, 'manifest.mat');
 if ~isfile(manifest_path)
-    error('NETRA:ManifestMissing', 'No manifest at %s', manifest_path);
+    error('VITREOUS:ManifestMissing', 'No manifest at %s', manifest_path);
 end
 loaded = load(manifest_path);
 manifest = loaded.manifest;
 
 fprintf('========================================================\n');
-fprintf('NETRA Model Comparison\n');
+fprintf('VITREOUS Model Comparison\n');
 fprintf('========================================================\n\n');
 
 % ─── Load models and their provenance ────────────────────────────────────
@@ -85,7 +85,7 @@ for i = 1:numel(specs)
     else
         % Proceeding would score the model on images it trained on and present
         % the result as held out, which is worse than refusing.
-        error('NETRA:NoProvenance', ...
+        error('VITREOUS:NoProvenance', ...
             ['Model "%s" records no training image list and no manifest was ' ...
              'found beside it. Without knowing what it trained on, any ' ...
              'comparison would score it on its own training data. Save the ' ...
@@ -114,7 +114,7 @@ if numel(held_out) < 8
     fprintf('         any difference below a few points as noise.\n');
 end
 if isempty(held_out)
-    error('NETRA:NoCommonHeldOut', ...
+    error('VITREOUS:NoCommonHeldOut', ...
         'No image is held out from every model. A fair comparison is impossible.');
 end
 fprintf('%s\n\n', strjoin(held_out, ', '));

@@ -1,4 +1,4 @@
-# Training NETRA Phase 3 on Google Colab's free GPU
+# Training VITREOUS Phase 3 on Google Colab's free GPU
 
 Training is 8-34 hours on this project's CPU and under an hour on an NVIDIA
 GPU. Colab provides a free T4.
@@ -16,7 +16,7 @@ terminal in June 2025, which is the only reason this works at all.
 On your machine:
 
 ```bash
-COPYFILE_DISABLE=1 tar czf netra-colab.tar.gz matlab configs data/processed/segmentation
+COPYFILE_DISABLE=1 tar czf vitreous-colab.tar.gz matlab configs data/processed/segmentation
 ```
 
 `COPYFILE_DISABLE=1` matters on macOS. Without it tar writes an AppleDouble
@@ -26,7 +26,7 @@ fails on a manifest mismatch. If an archive was made without it, clear them
 after extracting:
 
 ```bash
-find /content/netra -name "._*" -delete
+find /content/vitreous -name "._*" -delete
 ```
 
 Upload that file to Google Drive. Roughly 240 MB. Doing this once means later
@@ -111,9 +111,9 @@ falls back to CPU, which defeats the entire exercise, so do not skip this.
 ## Step 7: unpack the data
 
 ```bash
-mkdir -p /content/netra
-tar xzf /content/drive/MyDrive/netra-colab.tar.gz -C /content/netra
-ls /content/netra/data/processed/segmentation
+mkdir -p /content/vitreous
+tar xzf /content/drive/MyDrive/vitreous-colab.tar.gz -C /content/vitreous
+ls /content/vitreous/data/processed/segmentation
 ```
 
 ## Step 8: train
@@ -122,9 +122,9 @@ Write the script from a notebook cell:
 
 ```python
 %%writefile /content/run.m
-addpath(genpath('/content/netra/matlab'));
-cfg = load_config('/content/netra/configs/default_config.yaml');
-D = '/content/netra/data/processed/segmentation';
+addpath(genpath('/content/vitreous/matlab'));
+cfg = load_config('/content/vitreous/configs/default_config.yaml');
+D = '/content/vitreous/data/processed/segmentation';
 opts = struct('Encoder','resnet18','BaseFilters',16,'Depth',4, ...
               'MaxEpochs',60,'MiniBatchSize',8,'LearnRate',1e-3, ...
               'ClassWeightMode','balanced','ExecutionEnvironment','auto', ...
@@ -150,7 +150,7 @@ Copy it to Drive before the session ends, because `/content` is discarded:
 
 ```bash
 cp /content/unetpp_resnet18.mat /content/drive/MyDrive/
-cp /content/netra/data/processed/segmentation/manifest.mat /content/drive/MyDrive/v4_resnet18_manifest.mat
+cp /content/vitreous/data/processed/segmentation/manifest.mat /content/drive/MyDrive/v4_resnet18_manifest.mat
 ```
 
 Download both, then on your machine:

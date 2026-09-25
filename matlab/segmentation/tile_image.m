@@ -32,11 +32,11 @@ end
 [h, w, c] = size(img);
 
 if tile_size > h || tile_size > w
-    error('NETRA:TileTooLarge', ...
+    error('VITREOUS:TileTooLarge', ...
         'Tile size %d exceeds canvas [%d %d].', tile_size, h, w);
 end
 if overlap >= tile_size
-    error('NETRA:OverlapTooLarge', ...
+    error('VITREOUS:OverlapTooLarge', ...
         'Overlap %d must be smaller than tile size %d.', overlap, tile_size);
 end
 

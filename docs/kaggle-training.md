@@ -1,4 +1,4 @@
-# Training NETRA Phase 3 on Kaggle's free GPU
+# Training VITREOUS Phase 3 on Kaggle's free GPU
 
 Training takes 8-34 hours on CPU depending on configuration, and under an hour
 on an NVIDIA GPU. Kaggle offers free P100 or T4 GPUs with a 30 hour weekly quota
@@ -43,12 +43,12 @@ step deliberately installs nothing else.
 On your machine:
 
 ```bash
-tar czf netra-kaggle.tar.gz matlab configs data/processed/segmentation
+tar czf vitreous-kaggle.tar.gz matlab configs data/processed/segmentation
 ```
 
 In Kaggle: **Datasets** -> **New Dataset** -> upload that archive, name it
-`netra-phase3`. It appears in later notebooks at
-`/kaggle/input/netra-phase3/`.
+`vitreous-phase3`. It appears in later notebooks at
+`/kaggle/input/vitreous-phase3/`.
 
 This is the step that makes Kaggle better than Colab for iterating: it is done
 once, not once per session.
@@ -82,15 +82,15 @@ whole exercise is pointless, so do not skip this.
 ## Step 3: unpack and train
 
 ```python
-!mkdir -p /kaggle/working/netra
-!tar xzf /kaggle/input/netra-phase3/netra-kaggle.tar.gz -C /kaggle/working/netra
+!mkdir -p /kaggle/working/vitreous
+!tar xzf /kaggle/input/vitreous-phase3/vitreous-kaggle.tar.gz -C /kaggle/working/vitreous
 ```
 
 ```python
 %%writefile /kaggle/working/run.m
-addpath(genpath('/kaggle/working/netra/matlab'));
-cfg = load_config('/kaggle/working/netra/configs/default_config.yaml');
-D = '/kaggle/working/netra/data/processed/segmentation';
+addpath(genpath('/kaggle/working/vitreous/matlab'));
+cfg = load_config('/kaggle/working/vitreous/configs/default_config.yaml');
+D = '/kaggle/working/vitreous/data/processed/segmentation';
 
 opts = struct( ...
     'Encoder','resnet18', ...        % or 'scratch'

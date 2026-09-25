@@ -38,8 +38,8 @@ verifyEqual(testCase, a3, a1);
 end
 
 function testApplyTemperatureRejectsBadT(testCase)
-verifyError(testCase, @() apply_temperature([1 2 3], 0), 'NETRA:InvalidTemperature');
-verifyError(testCase, @() apply_temperature([1 2 3], -1), 'NETRA:InvalidTemperature');
+verifyError(testCase, @() apply_temperature([1 2 3], 0), 'VITREOUS:InvalidTemperature');
+verifyError(testCase, @() apply_temperature([1 2 3], -1), 'VITREOUS:InvalidTemperature');
 end
 
 % ─── temperature_scaling ──────────────────────────────────────────────────
@@ -72,7 +72,7 @@ end
 function testTemperatureRejectsMismatchedLabels(testCase)
 verifyError(testCase, ...
     @() temperature_scaling(randn(10, 5), randi(5, 8, 1), testCase.TestData.cfg), ...
-    'NETRA:LabelCount');
+    'VITREOUS:LabelCount');
 end
 
 % ─── attention_lesion_iou ─────────────────────────────────────────────────
@@ -120,7 +120,7 @@ function testReportWritesFile(testCase)
 [~, r] = local_aligned_fixture();
 g = local_fake_grade();
 xai = struct('iou', attention_lesion_iou(local_aligned_fixture(), r, testCase.TestData.cfg));
-out = fullfile(tempdir, ['netra_report_' char(matlab.lang.internal.uuid()) '.pdf']);
+out = fullfile(tempdir, ['vitreous_report_' char(matlab.lang.internal.uuid()) '.pdf']);
 cleanup = onCleanup(@() local_delete(out)); %#ok<NASGU>
 p = generate_pdf_report(out, r, g, xai, testCase.TestData.cfg, ...
     struct('ImageName', 'fixture.png'));
@@ -139,7 +139,7 @@ g = struct('grade', 2, 'grade_name', "Moderate NPDR", ...
 gc = struct('score_map_canvas', att, 'canvas', repmat(0.4, 512, 512, 3), ...
     'feature_layer', "effnet/conv_last");
 xai = struct('gradcam', gc, 'iou', attention_lesion_iou(att, r, testCase.TestData.cfg));
-out = fullfile(tempdir, ['netra_report_' char(matlab.lang.internal.uuid()) '.pdf']);
+out = fullfile(tempdir, ['vitreous_report_' char(matlab.lang.internal.uuid()) '.pdf']);
 cleanup = onCleanup(@() local_delete(out)); %#ok<NASGU>
 p = generate_pdf_report(out, r, g, xai, testCase.TestData.cfg, struct('ImageName', 'p4.png'));
 verifyTrue(testCase, isfile(p));

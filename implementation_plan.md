@@ -1,4 +1,4 @@
-# NETRA — MATLAB Master Implementation Plan
+# VITREOUS — MATLAB Master Implementation Plan
 
 **Problem Statement ID:** SIH26038  
 **Problem Statement Title:** Explainable AI for Diabetic Retinopathy Screening in Rural India  
@@ -9,7 +9,7 @@
 
 ## 1. Core Objective
 
-NETRA is a quality-aware, explainable AI Clinical Decision Support System (CDSS) for Diabetic Retinopathy (DR) screening in resource-constrained rural clinics. Built as a **100% end-to-end MATLAB pipeline**, it combines a **parallel dual-track deep learning engine** (lesion segmentation ∥ severity grading) with **MATLAB Simulink operational simulation**, ensuring the system is validated not just on diagnostic precision but on whether the screening workflow can scale in a real rural Primary Health Centre (PHC).
+VITREOUS is a quality-aware, explainable AI Clinical Decision Support System (CDSS) for Diabetic Retinopathy (DR) screening in resource-constrained rural clinics. Built as a **100% end-to-end MATLAB pipeline**, it combines a **parallel dual-track deep learning engine** (lesion segmentation ∥ severity grading) with **MATLAB Simulink operational simulation**, ensuring the system is validated not just on diagnostic precision but on whether the screening workflow can scale in a real rural Primary Health Centre (PHC).
 
 **The problem it solves:**
 - Rural India has widespread DR risk but very few ophthalmologists.
@@ -59,7 +59,7 @@ Raw Fundus Image (APTOS / IDRiD)
         IoU computation between Grad-CAM attention and UNet++ lesion masks
         Temperature Scaling → recalibrated confidence score
    → Clinical Decision Support Layer (Severity Grade + Lesion Overlay + Calibrated Confidence → PDF Report)
-   → MATLAB App Designer GUI (NETRA_App.mlapp for live interactive clinical triage)
+   → MATLAB App Designer GUI (VITREOUS_App.mlapp for live interactive clinical triage)
    → SimEvents Operational Model (Clinic throughput, doctor workload reduction simulation)
 ```
 
@@ -363,7 +363,7 @@ Optic disc suppression raises hard exudate precision from 0.616 to 0.630 with **
 #### MATLAB Files
 - `matlab/classification/build_hybrid_model.m` — Dual-branch ResNet-50 + EfficientNet `dlnetwork`, single 512 input, per-branch resize, feature fusion, plan's head. [COMPLETED ✅]
 - `matlab/classification/train_dr_classifier.m` — Two-stage trainer (APTOS → IDRiD), `trainnet`, saves after each stage, records provenance. Supports both frozen-feature (Step 4a) and end-to-end (Step 4b) modes. [COMPLETED ✅]
-- `matlab/classification/grade_dr_severity.m` — Inference; runs Phase 1 + Phase 2 itself and raises `NETRA:QualityGateFailed` on an ungradeable image, mirroring `segment_lesions`. Returns grade 0–4, probabilities, confidence. [COMPLETED ✅]
+- `matlab/classification/grade_dr_severity.m` — Inference; runs Phase 1 + Phase 2 itself and raises `VITREOUS:QualityGateFailed` on an ungradeable image, mirroring `segment_lesions`. Returns grade 0–4, probabilities, confidence. [COMPLETED ✅]
 - `matlab/tests/test_classification.m` — 18 unit tests; all pass without the support packages or any downloaded dataset. [COMPLETED ✅]
 
 Supporting files added while building the phase:
@@ -661,7 +661,7 @@ sens/spec, per Step 6) are unchanged.
    - Discrete-event model of a rural Primary Health Centre (PHC).
    - Simulates patient arrival → image capture → MATLAB Quality Gate check → recapture loop → enhancement → AI grading → tele-ophthalmologist review.
    - Evaluates queue times, camera utilization, and doctor workload reduction (target ≥ 80%).
-5. **MATLAB App Designer GUI (`matlab/app/NETRA_App.mlapp`)**:
+5. **MATLAB App Designer GUI (`matlab/app/VITREOUS_App.mlapp`)**:
    - Interactive desktop application for live judge demonstrations.
    - Allows users to select an image, view Quality Gate status, enhanced image, lesion overlays, DR grade, and Grad-CAM heatmap in one window.
 
@@ -675,7 +675,7 @@ sens/spec, per Step 6) are unchanged.
 - `matlab/tests/test_explainability.m` — Unit tests for the above. [DONE ✅ — Kathan]
 - `matlab/simulink/clinic_flow_simulation.slx` — SimEvents discrete-event clinic workflow model. [Team]
 - `matlab/simulink/run_throughput_analysis.m` — Runs simulation experiments and calculates doctor workload reduction metrics. [Team]
-- `matlab/app/NETRA_App.mlapp` — MATLAB App Designer interactive clinical GUI. [Team]
+- `matlab/app/VITREOUS_App.mlapp` — MATLAB App Designer interactive clinical GUI. [Team]
 
 > [!NOTE]
 > **Phase 5 explainability depends on Phase 4's grading model, which is not built
@@ -713,7 +713,7 @@ those as a floor and state the assumption explicitly.
 ```matlab
 addpath(genpath('matlab'));
 cfg = load_config('configs/default_config.yaml');
-load(netra_model_path(), 'net');
+load(vitreous_model_path(), 'net');
 r = segment_lesions('path/to/fundus.jpg', net, cfg);
 ```
 
@@ -832,7 +832,7 @@ The workload-reduction target of ≥ 80% follows from the referral rate: if the 
 refers 20% of patients, the ophthalmologist reviews 20% of the caseload. Say
 that plainly rather than presenting it as an emergent result of the simulation.
 
-**Step 6 — App Designer GUI (`NETRA_App.mlapp`).**
+**Step 6 — App Designer GUI (`VITREOUS_App.mlapp`).**
 
 The pipeline is already callable in one line, so the GUI is mostly layout:
 
@@ -840,7 +840,7 @@ The pipeline is already callable in one line, so the GUI is mostly layout:
 r = segment_lesions(imagePath, net, cfg);
 ```
 
-Handle the rejection path. `segment_lesions` raises `NETRA:QualityGateFailed` on
+Handle the rejection path. `segment_lesions` raises `VITREOUS:QualityGateFailed` on
 an ungradeable image, and the GUI should show `q.alert.message` and its action
 items rather than an error dialog. That recapture guidance is a genuine feature
 of the system and worth demonstrating.
@@ -868,7 +868,7 @@ reasonable model for the display.
 ## 5. Complete MATLAB Directory Structure
 
 ```
-NETRA-National-Eye-Triage-Retinal-Assessment/
+VITREOUS-National-Eye-Triage-Retinal-Assessment/
 ├── matlab/
 │   ├── config/
 │   │   └── load_config.m               # YAML config loader [DONE ✅]
@@ -924,7 +924,7 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 │   │   ├── clinic_flow_simulation.slx
 │   │   └── run_throughput_analysis.m
 │   ├── app/                            # Phase 5: Interactive GUI
-│   │   └── NETRA_App.mlapp
+│   │   └── VITREOUS_App.mlapp
 │   ├── demo/
 │   │   └── run_pipeline_demo.m         # Master pipeline demo script [DONE ✅]
 │   └── tests/
@@ -949,7 +949,7 @@ NETRA-National-Eye-Triage-Retinal-Assessment/
 | **Phase 2** | Preprocessing & Enhancement | Mayank & Krrish | `enhance_fundus.m`, `crop_fundus_roi.m`, `apply_clahe.m`, `apply_nlm_denoising.m`, `standardize_image.m` | **COMPLETED ✅** |
 | **Phase 3** | Lesion & Vessel Segmentation | Dhruv | `segment_vessels.m`, `locate_optic_disc.m`, `segment_lesions.m`, `unetpp_layers.m`, `train_lesion_segmentor.m` (nested UNet++ DAG) | **COMPLETED ✅** |
 | **Phase 4** | DR Severity Grading | Aadi | `build_hybrid_model.m`, `train_dr_classifier.m`, `grade_dr_severity.m`, `prepare_grading_dataset.m`, `multiclass_qwk.m` (ResNet-50 + EfficientNet-B0 fallback, two-stage; code done & unit-tested, training pending add-ons/datasets/GPU) | **CODE COMPLETE ✅ / training pending** |
-| **Phase 5** | XAI, GUI & SimEvents | Team | `generate_gradcam.m`, `clinic_flow_simulation.slx`, `NETRA_App.mlapp` | **PLANNED ⏳** |
+| **Phase 5** | XAI, GUI & SimEvents | Team | `generate_gradcam.m`, `clinic_flow_simulation.slx`, `VITREOUS_App.mlapp` | **PLANNED ⏳** |
 
 ---
 
@@ -986,7 +986,7 @@ with its `<name>_manifest.mat`, then run `run_model_comparison`.
 ### Phases 1 and 2 only
 
 1. Launch MATLAB R2026a.
-2. Navigate to project root: `cd NETRA-National-Eye-Triage-Retinal-Assessment`.
+2. Navigate to project root: `cd VITREOUS-National-Eye-Triage-Retinal-Assessment`.
 3. Execute master demo:
    ```matlab
    cd matlab/demo

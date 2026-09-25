@@ -1,4 +1,4 @@
-% RUN_DR_TRAINING  Train the NETRA Phase 4 DR severity grading model
+% RUN_DR_TRAINING  Train the VITREOUS Phase 4 DR severity grading model
 %
 %   Run this from the MATLAB Command Window:
 %
@@ -76,7 +76,7 @@ ddr_dir   = fullfile(processed, 'grading_ddr_640');
 idrid_dir = fullfile(processed, 'grading_idrid_640');
 
 fprintf('========================================================\n');
-fprintf('NETRA Phase 4 - DR Severity Grading Training\n');
+fprintf('VITREOUS Phase 4 - DR Severity Grading Training\n');
 fprintf('========================================================\n\n');
 
 % ─── Confirm the support packages load before doing any work ─────────────

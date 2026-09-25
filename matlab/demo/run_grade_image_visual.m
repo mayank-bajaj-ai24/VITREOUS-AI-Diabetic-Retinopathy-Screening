@@ -39,7 +39,7 @@ end
 q = quality_gate(proc, cfg);
 
 dr = dr_classes();
-fig = figure('Name','NETRA DR Screening','Color','w','Position',[80 80 1180 640]);
+fig = figure('Name','VITREOUS DR Screening','Color','w','Position',[80 80 1180 640]);
 tl = tiledlayout(fig, 2, 3, 'TileSpacing','compact','Padding','compact');
 
 % Input
@@ -51,7 +51,7 @@ if ~q.is_passed
     text(0.02,0.7,'QUALITY GATE: FAILED','Color',[0.7 0 0],'FontSize',20,'FontWeight','bold');
     text(0.02,0.45,sprintf('Reason: %s', strjoin(q.fail_codes,', ')),'FontSize',13,'Interpreter','none');
     text(0.02,0.25,'Recommendation: recapture the image; do not grade.','FontSize',13);
-    sgtitle(tl,'NETRA — Image is UNGRADABLE (recapture)','FontSize',16,'FontWeight','bold','Color',[0.7 0 0]);
+    sgtitle(tl,'VITREOUS — Image is UNGRADABLE (recapture)','FontSize',16,'FontWeight','bold','Color',[0.7 0 0]);
     result = struct('grade',NaN,'ungradable',true,'reason',strjoin(q.fail_codes,', '));
     if ~isempty(save_to), exportgraphics(fig, save_to, 'Resolution',120); end
     return;
@@ -85,7 +85,7 @@ set(gca,'XTick',0:4,'XTickLabel',{'G0 No DR','G1 Mild','G2 Moderate','G3 Severe'
 ylabel('probability'); ylim([0 1]); title('ICDR class probabilities','FontWeight','bold'); grid on;
 for i=1:5, text(i-1, p(i)+0.03, sprintf('%.2f',p(i)),'HorizontalAlignment','center','FontSize',10); end
 
-sgtitle(tl, sprintf('NETRA — DR Grade %d (%s),  %.0f%% confidence', ...
+sgtitle(tl, sprintf('VITREOUS — DR Grade %d (%s),  %.0f%% confidence', ...
     result.grade, result.grade_name, 100*result.confidence), 'FontSize',16,'FontWeight','bold');
 
 if ~isempty(save_to)

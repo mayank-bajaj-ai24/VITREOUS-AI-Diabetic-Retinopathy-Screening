@@ -93,7 +93,7 @@ if isempty(class_idx)
 end
 C = numel(scores);
 if class_idx < 1 || class_idx > C
-    error('NETRA:BadClassIdx', 'ClassIdx %d is outside 1..%d.', class_idx, C);
+    error('VITREOUS:BadClassIdx', 'ClassIdx %d is outside 1..%d.', class_idx, C);
 end
 
 % ─── Attention map ───────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ else
             use_occlusion = true;
         end
     catch ME_grad
-        warning('NETRA:GradCAMFallback', ...
+        warning('VITREOUS:GradCAMFallback', ...
             'Grad-CAM could not run (%s); using occlusion sensitivity.', ME_grad.message);
         use_occlusion = true;
     end
@@ -172,7 +172,7 @@ canvas_size = local_cfg(cfg, {'segmentation', 'input_size'}, 512);
 if enhanced
     canvas = image_input;
     if size(canvas, 1) ~= canvas_size || size(canvas, 2) ~= canvas_size
-        error('NETRA:CanvasSizeMismatch', ...
+        error('VITREOUS:CanvasSizeMismatch', ...
             'Enhanced input is %d×%d but segmentation.input_size is %d.', ...
             size(canvas, 1), size(canvas, 2), canvas_size);
     end
@@ -188,7 +188,7 @@ end
 
 quality = quality_gate(raw, cfg);
 if ~quality.is_passed
-    error('NETRA:QualityGateFailed', ...
+    error('VITREOUS:QualityGateFailed', ...
         'Image failed the quality gate (%s). %s', ...
         strjoin(quality.fail_codes, ', '), quality.alert.message);
 end
@@ -209,7 +209,7 @@ for i = 1:numel(layers)
         return;
     end
 end
-error('NETRA:NoInputLayer', ...
+error('VITREOUS:NoInputLayer', ...
     'Could not find an image input layer to read the network input size.');
 end
 
