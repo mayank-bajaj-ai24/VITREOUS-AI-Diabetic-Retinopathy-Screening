@@ -52,6 +52,8 @@ scalars. Treat results from that mode as illustrative, not measured.
 
 `results/all_results.mat` contains baseline, AI-ON/OFF, threshold and bandwidth sweeps, resource sweeps, annual scale, and resource optimization. AI workload reduction is calculated from simulated completed reviews only.
 
+`results/capacity_findings.md` states the operational finding in decision form: the highest-utilised resource, whether it is an actual constraint against the configured threshold, baseline numbers, and the experiments that did not improve throughput. `results/experiment_summary.csv` provides the sweep endpoints behind that statement, while `results/resource_optimization_search.csv` preserves every evaluated resource configuration rather than only the selected row in `recommendation.csv`.
+
 ## Key scripts
 
 - `run_ai_comparison.m` — AI-ON vs AI-OFF
