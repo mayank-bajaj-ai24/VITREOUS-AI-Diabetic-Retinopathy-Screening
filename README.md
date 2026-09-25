@@ -2,7 +2,7 @@
   <img src="app/public/vitreous_logo.png" alt="VITREOUS Logo" width="140"/>
 </p>
 
-# VITREOUS — National Eye Triage & Retinal Assessment
+# VITREOUS: AI-Powered Screening for Diabetic Retinopathy
 
 <p align="center">
   <strong>MATLAB-Based Explainable AI for Diabetic Retinopathy Screening in Rural India</strong>
