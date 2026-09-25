@@ -606,6 +606,13 @@ panel "Occlusion sensitivity" instead of "Grad-CAM". A flat network (like the de
 <table>
 <thead><tr><th>Date</th><th>Change</th></tr></thead>
 <tbody>
+<tr><td>2026-09-25</td><td><b>Score-CAM added (second attention method).</b> <code>generate_scorecam.m</code> — a
+gradient-free attention map that works on the nested hybrid (unlike Grad-CAM): each late-conv feature map is used as
+a soft mask on the image, scored by the class response, and the maps are weighted by those scores. It extracts the
+backbone sub-network to reach the nested conv, keeps the top <code>MaxChannels</code> and batches the forward passes
+for CPU feasibility. <code>run_scorecam_compare.m</code> runs it alongside occlusion sensitivity and reports whether
+the two independent methods agree (map correlation + each one's lesion alignment). Purpose: corroborate the occlusion
+map with a second method, not replace it.</td></tr>
 <tr><td>2026-09-23</td><td><b>Professional single-page report redesign.</b> Rebuilt <code>generate_pdf_report.m</code>
 around clinician feedback: VITREOUS logo + wordmark and patient header up top, a round severity badge, a compact grade
 probability strip, and only the three doctor-relevant images (enhanced fundus, AI findings with lesions marked, AI

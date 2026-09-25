@@ -198,6 +198,33 @@ verifyTrue(testCase, all(isfinite(gc.score_map_canvas(:))));
 verifyEqual(testCase, size(gc.overlay, 3), 3);
 end
 
+function testScoreCAMShapeAndRange(testCase)
+% Score-CAM on the flat stub reads its top-level 'features' conv; a few channels
+% keeps it fast. Checks a valid map comes back.
+local_assume_dlt(testCase);
+cfg = testCase.TestData.cfg;
+net = make_stub_grading_net(cfg);
+img = local_sample_image(testCase);
+sc = generate_scorecam(net, img, cfg, struct('MaxChannels', 8, 'BatchSize', 4));
+verifyEqual(testCase, size(sc.score_map_canvas), [512 512]);
+verifyGreaterThanOrEqual(testCase, min(sc.score_map_canvas(:)), 0);
+verifyLessThanOrEqual(testCase, max(sc.score_map_canvas(:)), 1);
+verifyTrue(testCase, all(isfinite(sc.score_map_canvas(:))));
+verifyEqual(testCase, sc.method, "score-cam");
+end
+
+function testScoreCAMBatchSizeInvariant(testCase)
+% A batch as large as the class count (5) must not transpose the scores: the
+% map has to match the one from a different batch size.
+local_assume_dlt(testCase);
+cfg = testCase.TestData.cfg;
+net = make_stub_grading_net(cfg);
+img = local_sample_image(testCase);
+a = generate_scorecam(net, img, cfg, struct('MaxChannels', 10, 'BatchSize', dr_classes().num_classes));
+b = generate_scorecam(net, img, cfg, struct('MaxChannels', 10, 'BatchSize', 8));
+verifyEqual(testCase, a.score_map, b.score_map, 'AbsTol', 1e-4);
+end
+
 % ───────────────────────── fixtures & helpers ─────────────────────────────
 
 function [logits, labels] = local_overconfident(N, C)
