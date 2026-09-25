@@ -1,15 +1,16 @@
 <p align="center">
-  <img src="app/public/vitreous_logo.png" alt="VITREOUS Logo" width="140"/>
+  <img src="app/public/vitreous_logo.png" alt="VITREOUS Logo" width="150"/>
 </p>
 
-# VITREOUS: AI-Powered Screening for Diabetic Retinopathy
+<h1 align="center">VITREOUS</h1>
 
 <p align="center">
-  <strong>MATLAB-Based Explainable AI for Diabetic Retinopathy Screening in Rural India</strong>
+  <strong>AI-Powered Screening for Diabetic Retinopathy</strong><br/>
+  MATLAB-Based Explainable AI Clinical Decision Support System for Rural India
 </p>
 
 <p align="center">
-  SIH 2026 · Problem Statement 26038 · MedTech / HealthTech · Team ByteCreww (Team ID 122665)
+  <em>SIH 2026 · Problem Statement 26038 · MedTech / HealthTech · Team ByteCreww (Team ID 122665)</em>
 </p>
 
 ---
