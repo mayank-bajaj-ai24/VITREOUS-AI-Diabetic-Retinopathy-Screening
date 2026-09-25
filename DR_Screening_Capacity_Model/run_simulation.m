@@ -22,4 +22,5 @@ results = struct('baseline',baselineData,'aiOn',aiData.aiOn,'aiOff',aiData.aiOff
     'annualScale',annualData,'resourceOptimization',optData);
 save(fullfile('results','all_results.mat'),'results');
 plot_results(results);
+write_capacity_findings(results, cfg);
 disp(results.baseline);

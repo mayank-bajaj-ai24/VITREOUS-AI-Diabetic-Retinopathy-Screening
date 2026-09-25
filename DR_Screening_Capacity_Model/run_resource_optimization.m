@@ -38,9 +38,15 @@ else
     [~, ix] = min(feasibleRows.cost);
     recommendation = feasibleRows(ix,:);
 end
+% Keep both the selected minimum-cost configuration and the complete search
+% evidence.  A one-row recommendation alone cannot explain the decision.
+if ~isfolder('results'), mkdir('results'); end
+writetable(resourceTable, fullfile('results', 'resource_optimization_search.csv'));
+if ~isempty(recommendation)
+    writetable(recommendation, fullfile('results', 'recommendation.csv'));
+end
 results = struct('resourceSearch', resourceTable, ...
     'recommendation', recommendation, 'targetThroughput', targetThroughput, ...
     'maxReviewWait', maxReviewWait, 'maxSyncBacklog', maxSyncBacklog, ...
     'maxUtilization', maxUtilization);
-if ~isfolder('results'), mkdir('results'); end
 save(fullfile('results', 'resource_optimization.mat'), 'results');
