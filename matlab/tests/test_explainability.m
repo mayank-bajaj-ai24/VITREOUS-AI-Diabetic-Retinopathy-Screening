@@ -198,6 +198,21 @@ verifyTrue(testCase, all(isfinite(gc.score_map_canvas(:))));
 verifyEqual(testCase, size(gc.overlay, 3), 3);
 end
 
+function testScoreCAMShapeAndRange(testCase)
+% Score-CAM on the flat stub reads its top-level 'features' conv; a few channels
+% keeps it fast. Checks a valid map comes back.
+local_assume_dlt(testCase);
+cfg = testCase.TestData.cfg;
+net = make_stub_grading_net(cfg);
+img = local_sample_image(testCase);
+sc = generate_scorecam(net, img, cfg, struct('MaxChannels', 8, 'BatchSize', 4));
+verifyEqual(testCase, size(sc.score_map_canvas), [512 512]);
+verifyGreaterThanOrEqual(testCase, min(sc.score_map_canvas(:)), 0);
+verifyLessThanOrEqual(testCase, max(sc.score_map_canvas(:)), 1);
+verifyTrue(testCase, all(isfinite(sc.score_map_canvas(:))));
+verifyEqual(testCase, sc.method, "score-cam");
+end
+
 % ───────────────────────── fixtures & helpers ─────────────────────────────
 
 function [logits, labels] = local_overconfident(N, C)
