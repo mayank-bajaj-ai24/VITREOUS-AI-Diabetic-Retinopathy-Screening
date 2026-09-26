@@ -38,8 +38,8 @@ verifyEqual(testCase, a3, a1);
 end
 
 function testApplyTemperatureRejectsBadT(testCase)
-verifyError(testCase, @() apply_temperature([1 2 3], 0), 'NETRA:InvalidTemperature');
-verifyError(testCase, @() apply_temperature([1 2 3], -1), 'NETRA:InvalidTemperature');
+verifyError(testCase, @() apply_temperature([1 2 3], 0), 'VITREOUS:InvalidTemperature');
+verifyError(testCase, @() apply_temperature([1 2 3], -1), 'VITREOUS:InvalidTemperature');
 end
 
 % ─── temperature_scaling ──────────────────────────────────────────────────
@@ -72,7 +72,7 @@ end
 function testTemperatureRejectsMismatchedLabels(testCase)
 verifyError(testCase, ...
     @() temperature_scaling(randn(10, 5), randi(5, 8, 1), testCase.TestData.cfg), ...
-    'NETRA:LabelCount');
+    'VITREOUS:LabelCount');
 end
 
 % ─── attention_lesion_iou ─────────────────────────────────────────────────
@@ -120,7 +120,7 @@ function testReportWritesFile(testCase)
 [~, r] = local_aligned_fixture();
 g = local_fake_grade();
 xai = struct('iou', attention_lesion_iou(local_aligned_fixture(), r, testCase.TestData.cfg));
-out = fullfile(tempdir, ['netra_report_' char(matlab.lang.internal.uuid()) '.pdf']);
+out = fullfile(tempdir, ['vitreous_report_' char(matlab.lang.internal.uuid()) '.pdf']);
 cleanup = onCleanup(@() local_delete(out)); %#ok<NASGU>
 p = generate_pdf_report(out, r, g, xai, testCase.TestData.cfg, ...
     struct('ImageName', 'fixture.png'));
@@ -139,7 +139,11 @@ g = struct('grade', 2, 'grade_name', "Moderate NPDR", ...
 gc = struct('score_map_canvas', att, 'canvas', repmat(0.4, 512, 512, 3), ...
     'feature_layer', "effnet/conv_last");
 xai = struct('gradcam', gc, 'iou', attention_lesion_iou(att, r, testCase.TestData.cfg));
+<<<<<<< HEAD
 out = fullfile(tempdir, ['netra_report_' char(matlab.lang.internal.uuid()) '.pdf']);
+=======
+out = fullfile(tempdir, ['vitreous_report_' char(matlab.lang.internal.uuid()) '.pdf']);
+>>>>>>> origin/main
 cleanup = onCleanup(@() local_delete(out)); %#ok<NASGU>
 p = generate_pdf_report(out, r, g, xai, testCase.TestData.cfg, struct('ImageName', 'p4.png'));
 verifyTrue(testCase, isfile(p));
@@ -196,6 +200,33 @@ verifyGreaterThanOrEqual(testCase, min(gc.score_map_canvas(:)), 0);
 verifyLessThanOrEqual(testCase, max(gc.score_map_canvas(:)), 1);
 verifyTrue(testCase, all(isfinite(gc.score_map_canvas(:))));
 verifyEqual(testCase, size(gc.overlay, 3), 3);
+end
+
+function testScoreCAMShapeAndRange(testCase)
+% Score-CAM on the flat stub reads its top-level 'features' conv; a few channels
+% keeps it fast. Checks a valid map comes back.
+local_assume_dlt(testCase);
+cfg = testCase.TestData.cfg;
+net = make_stub_grading_net(cfg);
+img = local_sample_image(testCase);
+sc = generate_scorecam(net, img, cfg, struct('MaxChannels', 8, 'BatchSize', 4));
+verifyEqual(testCase, size(sc.score_map_canvas), [512 512]);
+verifyGreaterThanOrEqual(testCase, min(sc.score_map_canvas(:)), 0);
+verifyLessThanOrEqual(testCase, max(sc.score_map_canvas(:)), 1);
+verifyTrue(testCase, all(isfinite(sc.score_map_canvas(:))));
+verifyEqual(testCase, sc.method, "score-cam");
+end
+
+function testScoreCAMBatchSizeInvariant(testCase)
+% A batch as large as the class count (5) must not transpose the scores: the
+% map has to match the one from a different batch size.
+local_assume_dlt(testCase);
+cfg = testCase.TestData.cfg;
+net = make_stub_grading_net(cfg);
+img = local_sample_image(testCase);
+a = generate_scorecam(net, img, cfg, struct('MaxChannels', 10, 'BatchSize', dr_classes().num_classes));
+b = generate_scorecam(net, img, cfg, struct('MaxChannels', 10, 'BatchSize', 8));
+verifyEqual(testCase, a.score_map, b.score_map, 'AbsTol', 1e-4);
 end
 
 % ───────────────────────── fixtures & helpers ─────────────────────────────

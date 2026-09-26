@@ -8,7 +8,7 @@ function result = grade_dr_severity(image_input, model, cfg, options)
 %   the trained grading model and returns the ICDR grade (0-4), the full class
 %   probability vector, and a confidence. It mirrors segment_lesions: a raw
 %   image can be passed straight in, and an image the quality gate rejects raises
-%   NETRA:QualityGateFailed rather than returning a confident wrong answer -- the
+%   VITREOUS:QualityGateFailed rather than returning a confident wrong answer -- the
 %   whole reason Phase 1 exists.
 %
 %   The model may be either configuration produced by train_dr_classifier, and
@@ -66,7 +66,7 @@ canvas_size = cfg.enhancement.target_size;
 if options.Enhanced
     canvas = image_input;
     if size(canvas, 1) ~= canvas_size || size(canvas, 2) ~= canvas_size
-        error('NETRA:CanvasSizeMismatch', ...
+        error('VITREOUS:CanvasSizeMismatch', ...
             'Enhanced input is %dx%d but enhancement.target_size is %d.', ...
             size(canvas, 1), size(canvas, 2), canvas_size);
     end
@@ -96,7 +96,7 @@ else
 
     quality = quality_gate(raw, cfg);
     if ~quality.is_passed
-        error('NETRA:QualityGateFailed', ...
+        error('VITREOUS:QualityGateFailed', ...
             'Image failed the quality gate (%s). %s', ...
             strjoin(quality.fail_codes, ', '), quality.alert.message);
     end
@@ -146,7 +146,7 @@ function [net, mode, fb] = resolve_model(model)
 fb = [];
 if ischar(model) || isstring(model)
     if ~isfile(model)
-        error('NETRA:ModelNotFound', 'No model file at %s', model);
+        error('VITREOUS:ModelNotFound', 'No model file at %s', model);
     end
     L = load(model);
     net = L.net;
@@ -174,7 +174,7 @@ else
 end
 
 if strcmpi(mode, 'frozen') && isempty(fb)
-    error('NETRA:MissingFeatureNets', ...
+    error('VITREOUS:MissingFeatureNets', ...
         ['Model is frozen-feature mode but carries no feature-net struct fb. ' ...
          'Load the .mat saved by train_dr_classifier, which includes it.']);
 end

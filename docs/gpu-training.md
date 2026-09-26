@@ -1,4 +1,4 @@
-# Training NETRA Phase 3 on a GPU
+# Training VITREOUS Phase 3 on a GPU
 
 Training the UNet++ lesion segmenter takes about 8 hours on an Apple M1 Pro and
 roughly 15-30 minutes on an NVIDIA GPU. MATLAB accelerates only through CUDA, so
@@ -37,12 +37,12 @@ configured, which is the part that otherwise consumes an afternoon.
 
 ```bash
 # on your machine
-tar czf netra-gpu.tar.gz matlab configs data/processed/segmentation
-scp -i key.pem netra-gpu.tar.gz ubuntu@<instance-ip>:~/
+tar czf vitreous-gpu.tar.gz matlab configs data/processed/segmentation
+scp -i key.pem vitreous-gpu.tar.gz ubuntu@<instance-ip>:~/
 
 # on the instance
 ssh -i key.pem ubuntu@<instance-ip>
-mkdir netra && tar xzf netra-gpu.tar.gz -C netra
+mkdir vitreous && tar xzf vitreous-gpu.tar.gz -C vitreous
 ```
 
 Then run one of the container commands below. Remember to terminate the
@@ -59,8 +59,8 @@ stay behind, because preparation has already been done.
 | `matlab/`, `configs/` | < 1 MB |
 
 ```bash
-tar czf netra-gpu.tar.gz matlab configs data/processed/segmentation
-scp netra-gpu.tar.gz user@gpu-host:~/
+tar czf vitreous-gpu.tar.gz matlab configs data/processed/segmentation
+scp vitreous-gpu.tar.gz user@gpu-host:~/
 ```
 
 ## Option A: a machine with an NVIDIA GPU and MATLAB already installed
@@ -92,7 +92,7 @@ use, so signing in is all that is required.
 ```bash
 docker run -it --rm --gpus all --shm-size=512M \
   -p 8888:8888 \
-  -v $HOME/netra:/home/matlab/netra \
+  -v $HOME/vitreous:/home/matlab/vitreous \
   mathworks/matlab-deep-learning:r2026a -browser
 ```
 
@@ -100,7 +100,7 @@ Open the printed URL, sign in with the institutional MathWorks account, then in
 the MATLAB Command Window:
 
 ```matlab
-cd /home/matlab/netra/matlab/demo
+cd /home/matlab/vitreous/matlab/demo
 run_training
 ```
 
@@ -112,9 +112,9 @@ network or through its VPN.
 ```bash
 docker run --rm --gpus all --shm-size=512M \
   -e MLM_LICENSE_FILE=27000@your-licence-server \
-  -v $HOME/netra:/netra \
+  -v $HOME/vitreous:/vitreous \
   mathworks/matlab-deep-learning:r2026a \
-  -batch "cd /netra/matlab/demo; run_training"
+  -batch "cd /vitreous/matlab/demo; run_training"
 ```
 
 Ask the department's MATLAB administrator for the port and hostname.

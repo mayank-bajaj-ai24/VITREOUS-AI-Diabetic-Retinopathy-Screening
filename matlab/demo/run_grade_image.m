@@ -1,5 +1,5 @@
 function result = run_grade_image(image_path, model_file)
-% RUN_GRADE_IMAGE  Grade one fundus image through the full NETRA pipeline
+% RUN_GRADE_IMAGE  Grade one fundus image through the full VITREOUS pipeline
 %
 %   run_grade_image('path/to/fundus.jpg')
 %   run_grade_image('path/to/fundus.jpg', 'path/to/model.mat')
@@ -57,7 +57,7 @@ if nargin < 1 || isempty(image_path)
 end
 
 fprintf('\n========================================================\n');
-fprintf('NETRA -- DR Screening Pipeline\n');
+fprintf('VITREOUS -- DR Screening Pipeline\n');
 fprintf('========================================================\n');
 fprintf('Image : %s\n', image_path);
 fprintf('Model : %s\n\n', model_file);
@@ -66,7 +66,7 @@ fprintf('Model : %s\n\n', model_file);
 try
     result = grade_dr_severity(image_path, model_file, cfg);
 catch err
-    if strcmp(err.identifier, 'NETRA:QualityGateFailed')
+    if strcmp(err.identifier, 'VITREOUS:QualityGateFailed')
         fprintf('Phase 1 Quality Gate : FAILED -- image is ungradable.\n');
         fprintf('  %s\n', err.message);
         fprintf('\nRecommendation: recapture the image; do not grade.\n');

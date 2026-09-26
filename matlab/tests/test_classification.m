@@ -191,7 +191,7 @@ model = struct('net', net, 'results', struct('mode', 'end-to-end'));
 black = zeros(512, 512, 3, 'uint8');
 verifyError(testCase, ...
     @() grade_dr_severity(black, model, testCase.TestData.cfg), ...
-    'NETRA:QualityGateFailed');
+    'VITREOUS:QualityGateFailed');
 end
 
 

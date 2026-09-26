@@ -1,5 +1,5 @@
 function run_walkthrough(image_path)
-% RUN_WALKTHROUGH  Stage-by-stage trace of one fundus image through NETRA
+% RUN_WALKTHROUGH  Stage-by-stage trace of one fundus image through VITREOUS
 %
 %   run_walkthrough()                  % uses the first sample image
 %   run_walkthrough('path/to/img.jpg') % any fundus image
@@ -45,13 +45,13 @@ titles = {};
 live = usejava('desktop') && feature('ShowFigureWindows');
 fig = [];
 if live
-    fig = figure('Name', sprintf('NETRA Walkthrough - %s', stem), ...
+    fig = figure('Name', sprintf('VITREOUS Walkthrough - %s', stem), ...
                  'NumberTitle', 'off', 'Color', [0.1 0.1 0.1], ...
                  'Position', [80 80 1500 650]);
 end
 
 fprintf('========================================================\n');
-fprintf('NETRA Walkthrough: %s\n', stem);
+fprintf('VITREOUS Walkthrough: %s\n', stem);
 fprintf('========================================================\n\n');
 
 % ═══ STAGE 0: raw capture ════════════════════════════════════════════════
@@ -135,7 +135,7 @@ draw_live(fig, panels, titles);
 % ═══ STAGE 3: segmentation ═══════════════════════════════════════════════
 fprintf('STAGE 3  Structure & Lesion Segmentation (Phase 3)\n');
 
-model_path = netra_model_path();
+model_path = vitreous_model_path();
 has_model = ~isempty(model_path);
 
 valid = canvas_valid_mask(geom);
@@ -244,7 +244,7 @@ n = numel(panels);
 cols = min(5, max(n, 1));
 rows = ceil(n / cols);
 t = tiledlayout(fig, rows, cols, 'TileSpacing', 'compact', 'Padding', 'compact');
-t.Title.String = 'NETRA: Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 (grade)';
+t.Title.String = 'VITREOUS: Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 (grade)';
 t.Title.Color = 'w';
 t.Title.FontWeight = 'bold';
 for i = 1:n

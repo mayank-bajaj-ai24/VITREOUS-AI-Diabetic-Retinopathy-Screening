@@ -97,11 +97,11 @@ records = [];
 for r = 1:numel(dataset_roots)
     root = dataset_roots{r};
     if ~isfolder(root)
-        error('NETRA:DatasetNotFound', 'Dataset root not found: %s', root);
+        error('VITREOUS:DatasetNotFound', 'Dataset root not found: %s', root);
     end
     found = discover_dataset(root, classes);
     if isempty(found)
-        error('NETRA:DatasetEmpty', ...
+        error('VITREOUS:DatasetEmpty', ...
             ['No recognised lesion dataset under %s. Expected an IDRiD ' ...
              '"A. Segmentation" tree or a DDR "lesion_segmentation" tree.'], root);
     end

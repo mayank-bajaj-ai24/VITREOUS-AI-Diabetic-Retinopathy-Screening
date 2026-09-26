@@ -23,7 +23,7 @@ function probs = apply_temperature(logits, T)
 %   See also TEMPERATURE_SCALING
 
 if ~isscalar(T) || ~isfinite(T) || T <= 0
-    error('NETRA:InvalidTemperature', ...
+    error('VITREOUS:InvalidTemperature', ...
         'Temperature must be a finite positive scalar, got %g.', T);
 end
 

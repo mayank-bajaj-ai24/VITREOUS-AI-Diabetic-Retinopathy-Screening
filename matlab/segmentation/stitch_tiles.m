@@ -29,10 +29,10 @@ end
 
 [t, t2, c, n] = size(tiles);
 if t ~= t2
-    error('NETRA:NonSquareTile', 'Tiles must be square, got [%d %d].', t, t2);
+    error('VITREOUS:NonSquareTile', 'Tiles must be square, got [%d %d].', t, t2);
 end
 if size(positions, 1) ~= n
-    error('NETRA:PositionMismatch', ...
+    error('VITREOUS:PositionMismatch', ...
         '%d tiles but %d positions.', n, size(positions, 1));
 end
 

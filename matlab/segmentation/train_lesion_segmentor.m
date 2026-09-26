@@ -150,7 +150,7 @@ tile_size = cfg.segmentation.tile_size;
 
 manifest_path = fullfile(data_dir, 'manifest.mat');
 if ~isfile(manifest_path)
-    error('NETRA:ManifestMissing', ...
+    error('VITREOUS:ManifestMissing', ...
         ['No manifest at %s. Run prepare_lesion_dataset first.'], manifest_path);
 end
 loaded = load(manifest_path);
@@ -283,7 +283,7 @@ img_dir = fullfile(split_dir, 'images');
 lab_dir = fullfile(split_dir, 'labels');
 
 if ~isfolder(img_dir)
-    error('NETRA:SplitMissing', 'No images directory at %s', img_dir);
+    error('VITREOUS:SplitMissing', 'No images directory at %s', img_dir);
 end
 
 % macOS tar writes AppleDouble metadata beside every file, named "._<file>".
@@ -301,7 +301,7 @@ if numel(keep) ~= numel(pxds.Files)
 end
 
 if numel(imds.Files) ~= numel(pxds.Files)
-    error('NETRA:PairMismatch', ...
+    error('VITREOUS:PairMismatch', ...
         '%d images but %d labels in %s', numel(imds.Files), numel(pxds.Files), split_dir);
 end
 
@@ -310,7 +310,7 @@ for i = 1:numel(imds.Files)
     [~, a, ~] = fileparts(imds.Files{i});
     [~, b, ~] = fileparts(pxds.Files{i});
     if ~strcmp(a, b)
-        error('NETRA:PairMisaligned', ...
+        error('VITREOUS:PairMisaligned', ...
             'Image "%s" is paired with label "%s".', a, b);
     end
 end
@@ -348,7 +348,7 @@ for i = 1:numel(files)
     [~, name, ext] = fileparts(files{i});
     key = [name ext];
     if ~isKey(lookup, key)
-        error('NETRA:TileNotInManifest', ...
+        error('VITREOUS:TileNotInManifest', ...
             ['Tile "%s" is not in the manifest. The prepared directory and ' ...
              'manifest.mat are out of step; re-run prepare_lesion_dataset.'], key);
     end

@@ -1,4 +1,4 @@
-% RUN_PIPELINE_DEMO  Run end-to-end NETRA MATLAB Pipeline (Phase 1 + Phase 2)
+% RUN_PIPELINE_DEMO  Run end-to-end VITREOUS MATLAB Pipeline (Phase 1 + Phase 2)
 %
 %   This script processes all sample fundus images in data/sample_images/,
 %   evaluates quality gate metrics, applies adaptive enhancement, and prints
@@ -22,7 +22,7 @@ addpath(genpath(fullfile(proj_root, 'matlab')));
 % 1. Load Configuration
 config_path = fullfile(proj_root, 'configs', 'default_config.yaml');
 fprintf('========================================================\n');
-fprintf('NETRA MATLAB Pipeline Demo (Phase 1 & Phase 2)\n');
+fprintf('VITREOUS MATLAB Pipeline Demo (Phase 1 & Phase 2)\n');
 fprintf('========================================================\n');
 fprintf('Loading configuration from: %s\n\n', config_path);
 cfg = load_config(config_path);

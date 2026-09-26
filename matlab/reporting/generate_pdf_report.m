@@ -1,5 +1,9 @@
 function out_path = generate_pdf_report(output_path, r, g, xai, cfg, options)
+<<<<<<< HEAD
 % GENERATE_PDF_REPORT  One-page NETRA clinical DR screening report (PDF)
+=======
+% GENERATE_PDF_REPORT  One-page VITREOUS clinical DR screening report (PDF)
+>>>>>>> origin/main
 %
 %   out_path = generate_pdf_report(output_path, r, g, xai, cfg)
 %   out_path = generate_pdf_report(output_path, r, g, xai, cfg, options)
@@ -7,7 +11,11 @@ function out_path = generate_pdf_report(output_path, r, g, xai, cfg, options)
 %   Phase 5 reporting. Produces a single, clean, branded page for a clinician:
 %   patient header, the DR grade and referral decision, three clinically
 %   meaningful images (enhanced fundus, annotated findings, AI attention), a
+<<<<<<< HEAD
 %   concise findings summary with NETRA's explainability result, and a clear
+=======
+%   concise findings summary with VITREOUS's explainability result, and a clear
+>>>>>>> origin/main
 %   recommendation. It deliberately omits engineering views (raw capture, vessel
 %   and disc detection stages, pixel-level anatomy) -- those belong in the
 %   walkthrough, not a doctor's report.
@@ -65,7 +73,11 @@ label_map = double(r.label_map);
 % ─── Palette ─────────────────────────────────────────────────────────────
 ink   = [0.13 0.16 0.22];
 mute  = [0.45 0.50 0.58];
+<<<<<<< HEAD
 brand = [0.10 0.42 0.62];       % NETRA blue
+=======
+brand = [0.10 0.42 0.62];       % VITREOUS blue
+>>>>>>> origin/main
 hair  = [0.83 0.86 0.90];
 sev = [0.16 0.63 0.30; 0.62 0.71 0.11; 0.95 0.62 0.07; 0.90 0.38 0.06; 0.80 0.13 0.13];
 gi = min(g.grade + 1, 5);
@@ -84,7 +96,11 @@ sq = @(w) w * W / H;   % normalized height that renders square for a given width
 
 % ── Header: logo + wordmark (left), patient details (right) ──
 local_logo_box(fig, root, [0.035 0.920 0.052]);
+<<<<<<< HEAD
 annotation(fig, 'textbox', [0.098 0.937 0.4 0.026], 'String', 'NETRA', ...
+=======
+annotation(fig, 'textbox', [0.098 0.937 0.4 0.026], 'String', 'VITREOUS', ...
+>>>>>>> origin/main
     'Color', brand, 'FontSize', 23, 'FontWeight', 'bold', 'EdgeColor', 'none', ...
     'VerticalAlignment', 'middle', 'Interpreter', 'none');
 annotation(fig, 'textbox', [0.100 0.916 0.45 0.018], 'String', ...
@@ -166,7 +182,11 @@ annotation(fig, 'textbox', [0.055 0.130 0.90 0.078], 'String', ...
 % ── Footer ──
 annotation(fig, 'line', [0.035 0.965], [0.058 0.058], 'Color', hair);
 annotation(fig, 'textbox', [0.035 0.018 0.93 0.035], 'String', ...
+<<<<<<< HEAD
     ['NETRA · National Eye Triage & Retinal Assessment     |     ' char(string(disclaimer))], ...
+=======
+    ['VITREOUS · National Eye Triage & Retinal Assessment     |     ' char(string(disclaimer))], ...
+>>>>>>> origin/main
     'Color', mute, 'FontSize', 8.5, 'EdgeColor', 'none', 'VerticalAlignment', 'middle', ...
     'HorizontalAlignment', 'center', 'Interpreter', 'none');
 
@@ -179,9 +199,15 @@ end
 % ═══════════════════════════ layout helpers ═════════════════════════════
 
 function local_logo_box(fig, root, pos3)
+<<<<<<< HEAD
 % Place the NETRA logo (composited over white) as a small square, top-left.
 try
     lp = fullfile(root, 'app', 'public', 'netra_logo.png');
+=======
+% Place the VITREOUS logo (composited over white) as a small square, top-left.
+try
+    lp = fullfile(root, 'app', 'public', 'vitreous_logo.png');
+>>>>>>> origin/main
     [im, ~, al] = imread(lp);
     im = im2double(im);
     if ~isempty(al)
@@ -279,7 +305,11 @@ end
 end
 
 function lines = local_xai_summary(xai, g) %#ok<INUSD>
+<<<<<<< HEAD
 % NETRA's explainability, in a sentence a clinician can act on.
+=======
+% VITREOUS's explainability, in a sentence a clinician can act on.
+>>>>>>> origin/main
 lines = strings(0, 1);
 if isfield(xai, 'iou') && ~isempty(xai.iou) && isfield(xai.iou, 'attention_mass_near_lesion')
     a = xai.iou;
@@ -393,7 +423,11 @@ if isfield(g, 'probabilities') && ~isempty(g.probabilities)
 elseif isfield(g, 'probs') && ~isempty(g.probs)
     probs = g.probs;
 else
+<<<<<<< HEAD
     error('NETRA:NoProbabilities', 'Grade result has neither .probabilities nor .probs.');
+=======
+    error('VITREOUS:NoProbabilities', 'Grade result has neither .probabilities nor .probs.');
+>>>>>>> origin/main
 end
 probs = double(probs(:))';
 end
@@ -406,7 +440,11 @@ elseif isfield(xai, 'gradcam') && isfield(xai.gradcam, 'canvas') && ~isempty(xai
 elseif isfield(options, 'Canvas') && ~isempty(options.Canvas)
     canvas = options.Canvas;
 else
+<<<<<<< HEAD
     error('NETRA:NoCanvas', ...
+=======
+    error('VITREOUS:NoCanvas', ...
+>>>>>>> origin/main
         ['No enhanced canvas available. grade_dr_severity returns none; pass the ' ...
          'Grad-CAM result in xai.gradcam (it carries .canvas) or set options.Canvas.']);
 end

@@ -1,5 +1,5 @@
 function cfg = load_config(yaml_path)
-% LOAD_CONFIG  Parse NETRA default_config.yaml into a MATLAB struct
+% LOAD_CONFIG  Parse VITREOUS default_config.yaml into a MATLAB struct
 %
 %   cfg = load_config()                              % uses default path
 %   cfg = load_config('configs/default_config.yaml') % explicit path
@@ -14,7 +14,7 @@ function cfg = load_config(yaml_path)
     end
 
     if ~isfile(yaml_path)
-        error('NETRA:ConfigNotFound', 'Config file not found: %s', yaml_path);
+        error('VITREOUS:ConfigNotFound', 'Config file not found: %s', yaml_path);
     end
 
     % Read all lines

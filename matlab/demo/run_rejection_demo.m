@@ -27,7 +27,7 @@ base_img_path = fullfile(sample_dir, img_files(1).name);
 base_img = imread(base_img_path);
 
 fprintf('========================================================\n');
-fprintf('NETRA MATLAB Recapture Alert & Feedback Demonstration\n');
+fprintf('VITREOUS MATLAB Recapture Alert & Feedback Demonstration\n');
 fprintf('========================================================\n\n');
 
 % -------------------------------------------------------------------------

@@ -42,11 +42,11 @@ end
 y_true = double(y_true(:));
 y_pred = double(y_pred(:));
 if numel(y_true) ~= numel(y_pred)
-    error('NETRA:QwkLengthMismatch', ...
+    error('VITREOUS:QwkLengthMismatch', ...
         'y_true has %d entries but y_pred has %d.', numel(y_true), numel(y_pred));
 end
 if isempty(y_true)
-    error('NETRA:QwkEmpty', 'Cannot compute QWK on empty input.');
+    error('VITREOUS:QwkEmpty', 'Cannot compute QWK on empty input.');
 end
 
 % Accept either 0-based grades or 1-based ids and normalise to 1..N indices.
@@ -60,7 +60,7 @@ else
 end
 if any(idx_true < 1) || any(idx_true > num_classes) || ...
    any(idx_pred < 1) || any(idx_pred > num_classes)
-    error('NETRA:QwkOutOfRange', ...
+    error('VITREOUS:QwkOutOfRange', ...
         'Labels fall outside 1..%d after normalisation.', num_classes);
 end
 

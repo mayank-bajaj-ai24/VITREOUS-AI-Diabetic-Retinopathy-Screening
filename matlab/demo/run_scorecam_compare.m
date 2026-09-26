@@ -31,6 +31,7 @@ end
 fprintf('Image: %s\n', image_path);
 
 % Phase 3 for the lesion masks.
+<<<<<<< HEAD
 if exist('netra_model_path', 'file')
     seg_model_p = netra_model_path();
 elseif exist('vitreous_model_path', 'file')
@@ -44,6 +45,10 @@ if ~isempty(seg_model_p) && isfile(seg_model_p)
 else
     r = struct('label_map', zeros(512, 512));
 end
+=======
+S = load(vitreous_model_path(), 'net');
+r = segment_lesions(image_path, S.net, cfg);
+>>>>>>> origin/main
 
 % Grading model (real end-to-end preferred).
 models_dir = fullfile(root, 'data', 'processed', 'models');

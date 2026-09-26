@@ -1,4 +1,4 @@
-% RUN_SEGMENTATION_DEMO  NETRA Phase 3 segmentation demonstration
+% RUN_SEGMENTATION_DEMO  VITREOUS Phase 3 segmentation demonstration
 %
 %   Runs the full Phase 1 -> Phase 2 -> Phase 3 chain on every sample fundus
 %   image and writes an annotated overlay per image.
@@ -28,7 +28,7 @@ addpath(genpath(fullfile(proj_root, 'matlab')));
 
 config_path = fullfile(proj_root, 'configs', 'default_config.yaml');
 fprintf('========================================================\n');
-fprintf('NETRA MATLAB Phase 3 Segmentation Demo\n');
+fprintf('VITREOUS MATLAB Phase 3 Segmentation Demo\n');
 fprintf('========================================================\n');
 cfg = load_config(config_path);
 classes = lesion_classes();
@@ -40,7 +40,7 @@ if ~exist(output_dir, 'dir')
 end
 
 % ─── Trained model, if one exists ────────────────────────────────────────
-model_path = netra_model_path();
+model_path = vitreous_model_path();
 net = [];
 if ~isempty(model_path)
     loaded = load(model_path, 'net');

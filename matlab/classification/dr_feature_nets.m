@@ -101,7 +101,7 @@ for i = 1:numel(candidates)
         net = imagePretrainedNetwork(nm, 'Weights', weights);
         used_name = nm;
         if ~strcmp(nm, preferred)
-            warning('NETRA:BackboneFallback', ...
+            warning('VITREOUS:BackboneFallback', ...
                 'Backbone "%s" unavailable; using "%s" instead.', preferred, nm);
         end
         return;
@@ -114,7 +114,7 @@ for i = 1:numel(candidates)
     end
 end
 
-error('NETRA:BackboneUnavailable', ...
+error('VITREOUS:BackboneUnavailable', ...
     'None of {%s} could be loaded. Last error: %s', ...
     strjoin(candidates, ', '), last_err.message);
 end
@@ -131,7 +131,7 @@ is_gap = arrayfun(@(L) isa(L, 'nnet.cnn.layer.GlobalAveragePooling2DLayer'), ...
     net.Layers);
 gap_idx = find(is_gap, 1, 'last');
 if isempty(gap_idx)
-    error('NETRA:NoFeatureLayer', ...
+    error('VITREOUS:NoFeatureLayer', ...
         'Backbone has no GlobalAveragePooling2DLayer to cut at.');
 end
 gap_name = net.Layers(gap_idx).Name;
@@ -187,7 +187,7 @@ function net = try_freeze(net)
 if exist('freezeNetwork', 'file')
     net = freezeNetwork(net);
 else
-    warning('NETRA:FreezeUnavailable', ...
+    warning('VITREOUS:FreezeUnavailable', ...
         'freezeNetwork not found; backbone left trainable.');
 end
 end

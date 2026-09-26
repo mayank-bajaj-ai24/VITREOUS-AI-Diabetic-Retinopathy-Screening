@@ -4,7 +4,7 @@ function result = segment_vessels(img, cfg, fov_mask)
 %   result = segment_vessels(img, cfg)
 %   result = segment_vessels(img, cfg, fov_mask)
 %
-%   Vessels matter to NETRA beyond being a deliverable. Haemorrhages are dark
+%   Vessels matter to VITREOUS beyond being a deliverable. Haemorrhages are dark
 %   red blobs sitting on a network of dark red vessels, so the vessel map is
 %   the exclusion mask that stops segment_lesions calling a vein a haemorrhage.
 %   Vessel calibre is also the substrate for venous beading, which is part of

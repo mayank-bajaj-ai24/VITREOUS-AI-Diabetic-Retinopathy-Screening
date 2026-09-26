@@ -389,7 +389,7 @@ function testUnetppRejectsIndivisibleInput(testCase)
 % better than a shape mismatch deep inside training.
 verifyError(testCase, ...
     @() unetpp_layers([500 500 3], 5, struct('Depth', 4)), ...
-    'NETRA:UnetppBadInputSize');
+    'VITREOUS:UnetppBadInputSize');
 end
 
 % ─── Tiling ───────────────────────────────────────────────────────────────
@@ -455,12 +455,12 @@ end
 function testStitchRejectsMismatchedPositions(testCase)
 verifyError(testCase, ...
     @() stitch_tiles(ones(64, 64, 1, 4), zeros(3, 2), [128, 128]), ...
-    'NETRA:PositionMismatch');
+    'VITREOUS:PositionMismatch');
 end
 
 function testTileImageRejectsOversizedTile(testCase)
 verifyError(testCase, @() tile_image(ones(100, 100, 3), 256, 32), ...
-    'NETRA:TileTooLarge');
+    'VITREOUS:TileTooLarge');
 end
 
 % ─── Lesion segmentation inference ────────────────────────────────────────
@@ -550,7 +550,7 @@ bad = zeros(400, 400, 3, 'uint8');
 bad(180:220, 180:220, :) = 200;
 
 verifyError(testCase, @() segment_lesions(bad, net, cfg), ...
-    'NETRA:QualityGateFailed');
+    'VITREOUS:QualityGateFailed');
 end
 
 function testSegmentLesionsRejectsWrongSizedEnhancedInput(testCase)
@@ -563,7 +563,7 @@ net = initialize(unetpp_layers([256 256 3], 5, ...
 verifyError(testCase, ...
     @() segment_lesions(zeros(128, 128, 3, 'uint8'), net, cfg, ...
                         struct('Enhanced', true)), ...
-    'NETRA:CanvasSizeMismatch');
+    'VITREOUS:CanvasSizeMismatch');
 end
 
 function testMinLesionAreaFiltersSmallRegions(testCase)
@@ -775,7 +775,7 @@ if ~resnet18_available()
 end
 verifyError(testCase, ...
     @() unetpp_layers([256 256 3], 5, struct('Encoder', 'resnet18', 'Depth', 3)), ...
-    'NETRA:ResnetDepth');
+    'VITREOUS:ResnetDepth');
 end
 
 function tf = resnet18_available()

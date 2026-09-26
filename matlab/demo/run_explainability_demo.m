@@ -42,8 +42,8 @@ fprintf('Image: %s\n', image_path);
 
 % ─── 1. Phase 3 segmentation (real) ──────────────────────────────────────
 fprintf('[1/6] Lesion segmentation (Phase 3)...\n');
-seg_model = netra_model_path();
-assert(~isempty(seg_model), 'No segmentation model found; see netra_model_path.');
+seg_model = vitreous_model_path();
+assert(~isempty(seg_model), 'No segmentation model found; see vitreous_model_path.');
 S = load(seg_model, 'net');
 r = segment_lesions(image_path, S.net, cfg);
 
@@ -117,7 +117,11 @@ out_dir = fullfile(root, 'data', 'processed', 'reports');
 out_pdf = fullfile(out_dir, ['report_' name '.pdf']);
 xai = struct('gradcam', gc, 'iou', iou, 'calibration', cal, 'quality', local_quality(g));
 ropts = struct('ImageName', [name '.png'], 'Confidence', disp_conf, ...
+<<<<<<< HEAD
     'PatientId', 'NETRA-DEMO-0001');
+=======
+    'PatientId', 'VITREOUS-DEMO-0001');
+>>>>>>> origin/main
 if isempty(gc)
     % No Grad-CAM result to carry the canvas; enhance once for the report.
     ropts.Canvas = local_enhance_canvas(image_path, cfg);

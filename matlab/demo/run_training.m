@@ -1,4 +1,4 @@
-% RUN_TRAINING  Train the NETRA Phase 3 UNet++ lesion segmentation model
+% RUN_TRAINING  Train the VITREOUS Phase 3 UNet++ lesion segmentation model
 %
 %   Run this from the MATLAB Command Window:
 %
@@ -55,7 +55,7 @@ candidates = { ...
 roots = candidates(cellfun(@isfolder, candidates));
 
 fprintf('========================================================\n');
-fprintf('NETRA Phase 3 - UNet++ Lesion Segmentation Training\n');
+fprintf('VITREOUS Phase 3 - UNet++ Lesion Segmentation Training\n');
 fprintf('========================================================\n\n');
 
 % ─── Prepare the dataset if it is not already built ──────────────────────

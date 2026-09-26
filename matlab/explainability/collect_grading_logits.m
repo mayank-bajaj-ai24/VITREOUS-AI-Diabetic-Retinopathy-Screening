@@ -54,7 +54,11 @@ if ~iscell(images), images = num2cell(images); end   % tolerate a struct/array
 N = numel(images);
 grades = double(grades(:));
 if numel(grades) ~= N
+<<<<<<< HEAD
     error('NETRA:LabelCount', 'images has %d entries but grades has %d.', N, numel(grades));
+=======
+    error('VITREOUS:LabelCount', 'images has %d entries but grades has %d.', N, numel(grades));
+>>>>>>> origin/main
 end
 
 nc = 5;
