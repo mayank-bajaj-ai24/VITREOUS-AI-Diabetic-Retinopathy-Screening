@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, UserCircle2 } from 'lucide-react';
 import './landing/landing.css'; // Reuse landing aesthetics
 
-const LOGO = '/netra_logo.png';
+const LOGO = '/vitreous_logo.png';
 
 export default function Login() {
   const [role, setRole] = useState('Doctor');

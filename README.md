@@ -113,10 +113,10 @@ VITREOUS/
 │   ├── reporting/                # Branded clinical PDF generator
 │   ├── segmentation/             # UNet++ lesion & vessel segmentors
 │   ├── tests/                    # MATLAB unit test suites
-│   ├── netra_desktop_app.m       # Desktop UI standalone app
+│   ├── vitreous_desktop_app.m       # Desktop UI standalone app
 │   └── run_api_pipeline.m        # MATLAB UIHTML / API bridge
 │
-├── netra_pipeline.py             # Python native end-to-end AI pipeline
+├── vitreous_pipeline.py             # Python native end-to-end AI pipeline
 ├── server.py                     # Flask API backend (port 5000)
 ├── configs/                      # Pipeline YAML parameters
 ├── data/                         # Sample fundus images and model checkpoints
@@ -160,7 +160,7 @@ If running inside MATLAB (R2020a through R2026b):
 1. Launch **MATLAB** and set current directory to the project root.
 2. Run the desktop application:
    ```matlab
-   netra_desktop_app
+   vitreous_desktop_app
    ```
 3. Or test individual pipeline modules via the demo scripts:
    ```matlab

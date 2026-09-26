@@ -1,7 +1,7 @@
 import React from 'react';
 import { Shield, Heart, ExternalLink, ArrowUp } from 'lucide-react';
 
-const LOGO = '/netra_logo.png';
+const LOGO = '/vitreous_logo.png';
 
 export default function Footer() {
   const scrollToTop = () => {
