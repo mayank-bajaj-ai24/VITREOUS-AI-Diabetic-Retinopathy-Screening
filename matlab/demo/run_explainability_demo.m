@@ -117,15 +117,7 @@ out_dir = fullfile(root, 'data', 'processed', 'reports');
 out_pdf = fullfile(out_dir, ['report_' name '.pdf']);
 xai = struct('gradcam', gc, 'iou', iou, 'calibration', cal, 'quality', local_quality(g));
 ropts = struct('ImageName', [name '.png'], 'Confidence', disp_conf, ...
-<<<<<<< HEAD
-<<<<<<< HEAD
-    'PatientId', 'NETRA-DEMO-0001');
-=======
     'PatientId', 'VITREOUS-DEMO-0001');
->>>>>>> origin/main
-=======
-    'PatientId', 'VITREOUS-DEMO-0001');
->>>>>>> origin/main
 if isempty(gc)
     % No Grad-CAM result to carry the canvas; enhance once for the report.
     ropts.Canvas = local_enhance_canvas(image_path, cfg);
