@@ -1,7 +1,8 @@
 import React from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, MonitorPlay, User, LogOut, Activity, Settings } from 'lucide-react';
+import { LayoutDashboard, MonitorPlay, User, LogOut, Activity, Settings, Cpu } from 'lucide-react';
 import AnalysisTab from './AnalysisTab';
+import CapacityTab from './CapacityTab';
 import AccountTab from './AccountTab';
 
 const LOGO = '/netra_logo.png';
@@ -38,6 +39,11 @@ export default function Dashboard() {
             <span>AI Analysis</span>
           </Link>
 
+          <Link to="/dashboard/capacity" className={`nav-item ${isActive('/dashboard/capacity')}`}>
+            <Cpu size={20} />
+            <span>Capacity Sim</span>
+          </Link>
+
           <Link to="/dashboard/account" className={`nav-item ${isActive('/dashboard/account')}`}>
             <User size={20} />
             <span>Account Info</span>
@@ -61,6 +67,7 @@ export default function Dashboard() {
         <Routes>
           <Route path="/" element={<OverviewTab />} />
           <Route path="/analysis" element={<AnalysisTab />} />
+          <Route path="/capacity" element={<CapacityTab />} />
           <Route path="/account" element={<AccountTab />} />
         </Routes>
       </div>
