@@ -1,171 +1,315 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, UserCircle2 } from 'lucide-react';
-import './landing/landing.css'; // Reuse landing aesthetics
+import React, { useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ArrowLeft, ArrowRight, Eye, EyeOff, Stethoscope, ClipboardList, User,
+  Check, AlertCircle, Loader2,
+} from 'lucide-react';
+import './landing/landing.css'; // Loads the shared fonts
+import './Login.css';
 
 const LOGO = '/vitreous_logo.png';
 
+const ROLES = [
+  {
+    id: 'Doctor',
+    label: 'Doctor',
+    hint: 'Ophthalmologist',
+    Icon: Stethoscope,
+    idLabel: 'Staff ID',
+    idPlaceholder: 'e.g. DOC-1042',
+  },
+  {
+    id: 'Nurse',
+    label: 'Health worker',
+    hint: 'Nurse / technician',
+    Icon: ClipboardList,
+    idLabel: 'Staff ID',
+    idPlaceholder: 'e.g. PHC-2231',
+  },
+  {
+    id: 'Patient',
+    label: 'Patient',
+    hint: 'Or guardian',
+    Icon: User,
+    idLabel: 'ABHA number or Patient ID',
+    idPlaceholder: 'e.g. 91-1234-5678-9012',
+  },
+];
+
+const POINTS = [
+  'Every photo passes a quality check before it is graded',
+  'Findings that need attention go to an ophthalmologist',
+  'Designed around the DPDP Act 2023',
+];
+
 export default function Login() {
+  const navigate = useNavigate();
+  const passwordRef = useRef(null);
   const [role, setRole] = useState('Doctor');
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
-  const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
-  const handleLogin = (e) => {
+  const current = ROLES.find((r) => r.id === role);
+
+  const validate = () => {
+    const next = {};
+    if (!loginId.trim()) next.loginId = `Enter your ${current.idLabel.toLowerCase()}.`;
+    if (!password) next.password = 'Enter your password.';
+    return next;
+  };
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (loginId && password) {
-      // Basic validation just to ensure fields are filled before navigating
-      navigate('/dashboard');
+    const next = validate();
+    setErrors(next);
+    if (Object.keys(next).length) return;
+
+    // No real authentication in this build; a short pause keeps the
+    // loading state visible before entering the dashboard.
+    setSubmitting(true);
+    try {
+      sessionStorage.setItem('vitreous.role', role);
+    } catch {
+      // Storage blocked; the dashboard falls back to a generic greeting
     }
+    setTimeout(() => navigate('/dashboard'), 700);
+  };
+
+  const handleKey = (e) => {
+    if (typeof e.getModifierState === 'function') setCapsLock(e.getModifierState('CapsLock'));
   };
 
   return (
-    <div className="landing-root" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0a0a0a' }}>
-      {/* Simple Header */}
-      <nav className="l-nav solid" style={{ position: 'absolute' }}>
-        <div className="l-nav-inner" style={{ justifyContent: 'center' }}>
-          <div className="l-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-            <img src={LOGO} alt="VITREOUS" className="logo-img" />
-            <span>VITREOUS</span>
-          </div>
+    <div className="auth-root">
+      {/* ── Left: brand panel ── */}
+      <aside className="auth-aside" aria-hidden="true">
+        <Link to="/" className="auth-brand" tabIndex={-1}>
+          <img src={LOGO} alt="" />
+          <span>VITREOUS</span>
+        </Link>
+
+        <div className="auth-aside-body">
+          <motion.div
+            className="auth-fundus"
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <img src="/retina_fundus.jpg" alt="" />
+          </motion.div>
+
+          <motion.h1
+            className="auth-aside-title"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          >
+            The clinical portal for diabetic eye screening.
+          </motion.h1>
+
+          <ul className="auth-points">
+            {POINTS.map((p, i) => (
+              <motion.li
+                key={p}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 + i * 0.1, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <span className="auth-point-check"><Check size={12} strokeWidth={3} /></span>
+                {p}
+              </motion.li>
+            ))}
+          </ul>
         </div>
-      </nav>
 
-      {/* Login Container */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '120px 20px 20px' }}>
-        <div className="login-card" style={{
-          backgroundColor: '#111',
-          border: '1px solid #333',
-          borderRadius: '16px',
-          padding: '40px',
-          width: '100%',
-          maxWidth: '420px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '24px'
-        }}>
-          
-          <div style={{ textAlign: 'center' }}>
-            <ShieldCheck size={48} color="#00e5ff" style={{ marginBottom: '16px' }} />
-            <h2 style={{ fontSize: '1.8rem', color: '#fff', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>Secure Access</h2>
-            <p style={{ color: '#888', margin: 0, fontSize: '0.95rem' }}>Login to the VITREOUS Clinical Portal</p>
-          </div>
+        <p className="auth-aside-foot">Built by Team ByteCrew · SIH 2026</p>
+      </aside>
 
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            {/* Role Dropdown */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ color: '#ccc', fontSize: '0.85rem', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Access Level</label>
-              <div style={{ position: 'relative' }}>
-                <select 
-                  value={role} 
-                  onChange={(e) => setRole(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    backgroundColor: '#1a1a1a',
-                    border: '1px solid #333',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    fontSize: '1rem',
-                    appearance: 'none',
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="Doctor">Doctor / Ophthalmologist</option>
-                  <option value="Nurse">Nurse / Technician</option>
-                  <option value="Patient">Patient / Guardian</option>
-                </select>
-                <UserCircle2 size={18} color="#666" style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+      {/* ── Right: form ── */}
+      <main className="auth-main">
+        <div className="auth-topbar">
+          <Link to="/" className="auth-back">
+            <ArrowLeft size={16} />
+            <span>Back to home</span>
+          </Link>
+          <Link to="/" className="auth-brand auth-brand-mobile">
+            <img src={LOGO} alt="" />
+            <span>VITREOUS</span>
+          </Link>
+        </div>
+
+        <motion.div
+          className="auth-panel"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <h2 className="auth-title">Sign in</h2>
+          <p className="auth-sub">Choose how you use VITREOUS, then enter your details.</p>
+
+          <form onSubmit={handleSubmit} noValidate>
+            <fieldset className="auth-roles">
+              <legend className="auth-label">I am a</legend>
+              <div className="auth-roles-grid" role="radiogroup">
+                {ROLES.map((r) => {
+                  const selected = role === r.id;
+                  return (
+                    <label key={r.id} className={`auth-role${selected ? ' selected' : ''}`}>
+                      <input
+                        type="radio"
+                        name="role"
+                        value={r.id}
+                        checked={selected}
+                        onChange={() => {
+                          setRole(r.id);
+                          setErrors({});
+                        }}
+                      />
+                      {selected && (
+                        <motion.span
+                          layoutId="authRole"
+                          className="auth-role-bg"
+                          transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+                        />
+                      )}
+                      <r.Icon size={20} className="auth-role-icon" />
+                      <span className="auth-role-label">{r.label}</span>
+                      <span className="auth-role-hint">{r.hint}</span>
+                    </label>
+                  );
+                })}
               </div>
-            </div>
+            </fieldset>
 
-            {/* Login ID */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ color: '#ccc', fontSize: '0.85rem', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Login ID</label>
-              <input 
-                type="text" 
-                required
-                placeholder={role === 'Patient' ? "Enter Patient ID" : "Enter Staff ID"}
+            <div className={`auth-field${errors.loginId ? ' invalid' : ''}`}>
+              <label className="auth-label" htmlFor="login-id">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={current.idLabel}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {current.idLabel}
+                  </motion.span>
+                </AnimatePresence>
+              </label>
+              <input
+                id="login-id"
+                type="text"
+                autoComplete="username"
+                placeholder={current.idPlaceholder}
                 value={loginId}
-                onChange={(e) => setLoginId(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #333',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '1rem',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
+                onChange={(e) => {
+                  setLoginId(e.target.value);
+                  if (errors.loginId) setErrors((x) => ({ ...x, loginId: undefined }));
                 }}
-                onFocus={(e) => e.target.style.borderColor = '#00e5ff'}
-                onBlur={(e) => e.target.style.borderColor = '#333'}
+                aria-invalid={Boolean(errors.loginId)}
+                aria-describedby={errors.loginId ? 'login-id-error' : undefined}
               />
+              {errors.loginId && (
+                <p className="auth-error" id="login-id-error" role="alert">
+                  <AlertCircle size={14} /> {errors.loginId}
+                </p>
+              )}
             </div>
 
-            {/* Password */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ color: '#ccc', fontSize: '0.85rem', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Password</label>
-              <input 
-                type="password" 
-                required
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #333',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '1rem',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#00e5ff'}
-                onBlur={(e) => e.target.style.borderColor = '#333'}
-              />
+            <div className={`auth-field${errors.password ? ' invalid' : ''}`}>
+              <div className="auth-label-row">
+                <label className="auth-label" htmlFor="login-password">Password</label>
+                <button type="button" className="auth-link" onClick={() => setShowHelp((v) => !v)} aria-expanded={showHelp}>
+                  Forgot password?
+                </button>
+              </div>
+              <div className="auth-input-wrap">
+                <input
+                  id="login-password"
+                  ref={passwordRef}
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (errors.password) setErrors((x) => ({ ...x, password: undefined }));
+                  }}
+                  onKeyDown={handleKey}
+                  onKeyUp={handleKey}
+                  onBlur={() => setCapsLock(false)}
+                  aria-invalid={Boolean(errors.password)}
+                  aria-describedby={errors.password ? 'login-password-error' : undefined}
+                />
+                <button
+                  type="button"
+                  className="auth-eye"
+                  onClick={() => {
+                    setShowPassword((v) => !v);
+                    passwordRef.current?.focus();
+                  }}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="auth-error" id="login-password-error" role="alert">
+                  <AlertCircle size={14} /> {errors.password}
+                </p>
+              )}
+              {capsLock && !errors.password && <p className="auth-note">Caps Lock is on.</p>}
+
+              <AnimatePresence initial={false}>
+                {showHelp && (
+                  <motion.p
+                    className="auth-help"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    {role === 'Patient'
+                      ? 'Ask the health centre where you were screened to reset your access.'
+                      : 'Contact your district programme administrator to reset your staff password.'}
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* Submit */}
-            <button 
-              type="submit" 
-              style={{
-                marginTop: '12px',
-                padding: '14px',
-                backgroundColor: '#fff',
-                color: '#000',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'transform 0.1s, opacity 0.2s'
-              }}
-              onMouseOver={(e) => e.target.style.opacity = '0.9'}
-              onMouseOut={(e) => e.target.style.opacity = '1'}
-              onMouseDown={(e) => e.target.style.transform = 'scale(0.98)'}
-              onMouseUp={(e) => e.target.style.transform = 'scale(1)'}
-            >
-              Sign In <ArrowRight size={18} />
+            <label className="auth-check">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              <span className="auth-check-box"><Check size={12} strokeWidth={3} /></span>
+              Keep me signed in on this device
+            </label>
+
+            <button type="submit" className="auth-submit" disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 size={18} className="auth-spin" />
+                  <span>Signing in…</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign in as {current.label.toLowerCase()}</span>
+                  <ArrowRight size={18} />
+                </>
+              )}
             </button>
           </form>
-          
-          <div style={{ textAlign: 'center', marginTop: '8px' }}>
-            <a href="#" style={{ color: '#666', fontSize: '0.85rem', textDecoration: 'none' }}>Forgot password? Contact IT Support</a>
-          </div>
 
-        </div>
-      </div>
+          <p className="auth-demo">
+            Demo build — any ID and password will open the dashboard.
+          </p>
+        </motion.div>
+      </main>
     </div>
   );
 }

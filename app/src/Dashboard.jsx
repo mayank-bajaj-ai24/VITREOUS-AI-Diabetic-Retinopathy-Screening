@@ -1,110 +1,153 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, MonitorPlay, User, LogOut, Activity, Settings, Cpu } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { LayoutDashboard, MonitorPlay, User, LogOut, Cpu, ChevronRight, ScanEye } from 'lucide-react';
+import './dashboard/dashboard.css';
 import AnalysisTab from './AnalysisTab';
 import CapacityTab from './CapacityTab';
 import AccountTab from './AccountTab';
+import Overview from './dashboard/Overview';
+import { useBackendHealth } from './dashboard/useBackendHealth';
 
 const LOGO = '/vitreous_logo.png';
+
+const NAV = [
+  { to: '/dashboard', label: 'Overview', Icon: LayoutDashboard },
+  { to: '/dashboard/analysis', label: 'AI Analysis', Icon: MonitorPlay },
+  { to: '/dashboard/capacity', label: 'Capacity Sim', Icon: Cpu },
+  { to: '/dashboard/account', label: 'Account Info', Icon: User },
+];
+
+const ROLE_LABEL = { Doctor: 'Doctor', Nurse: 'Health worker', Patient: 'Patient' };
 
 export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [health] = useBackendHealth();
+
+  const path = location.pathname.replace(/\/$/, '') || '/dashboard';
+  const current = NAV.find((n) => n.to === path) || NAV[0];
+
+  const role = useMemo(() => {
+    try {
+      return sessionStorage.getItem('vitreous.role');
+    } catch {
+      return null;
+    }
+  }, []);
+  const roleLabel = ROLE_LABEL[role] || 'Clinician';
 
   const handleLogout = () => {
+    try {
+      sessionStorage.removeItem('vitreous.role');
+    } catch {
+      // ignore
+    }
     navigate('/');
   };
 
-  const isActive = (path) => location.pathname === path ? 'active' : '';
+  const status = {
+    checking: { cls: '', label: 'Checking backend' },
+    online: { cls: 'ok', label: 'MATLAB engine ready' },
+    busy: { cls: 'ok', label: 'MATLAB analysing' },
+    loading: { cls: '', label: 'MATLAB loading models' },
+    bridge: { cls: 'ok', label: 'MATLAB bridge' },
+    offline: { cls: 'bad', label: 'Engine offline' },
+  }[health.status];
 
   return (
     <div className="app-container">
-      {/* SIDEBAR */}
-      <div className="sidebar">
-        <div className="sidebar-header" onClick={() => navigate('/')} style={{cursor: 'pointer'}}>
+      <aside className="sidebar">
+        <div className="sidebar-header" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <img src={LOGO} alt="VITREOUS" className="sidebar-logo-img" />
           <span>VITREOUS</span>
         </div>
 
-        <div className="nav-section" style={{ marginTop: '32px' }}>
-          <div className="nav-label">WORKSPACE</div>
-          
-          <Link to="/dashboard" className={`nav-item ${location.pathname === '/dashboard' || location.pathname === '/dashboard/' ? 'active' : ''}`}>
-            <LayoutDashboard size={20} />
-            <span>Overview</span>
-          </Link>
-          
-          <Link to="/dashboard/analysis" className={`nav-item ${isActive('/dashboard/analysis')}`}>
-            <MonitorPlay size={20} />
-            <span>AI Analysis</span>
-          </Link>
+        <nav className="nav-section" aria-label="Dashboard">
+          <div className="nav-label">Workspace</div>
+          {NAV.map(({ to, label, Icon }) => {
+            const active = current.to === to;
+            return (
+              <Link key={to} to={to} className={`nav-item${active ? ' active' : ''}`} aria-current={active ? 'page' : undefined}>
+                {active && (
+                  <motion.span
+                    layoutId="navActive"
+                    className="nav-item-bg"
+                    transition={{ type: 'spring', stiffness: 420, damping: 36 }}
+                  />
+                )}
+                <Icon size={19} />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
+        </nav>
 
-          <Link to="/dashboard/capacity" className={`nav-item ${isActive('/dashboard/capacity')}`}>
-            <Cpu size={20} />
-            <span>Capacity Sim</span>
-          </Link>
+        <div className="sidebar-foot">
+          <div className={`sidebar-system ${status.cls}`}>
+            <div className="sidebar-system-row">
+              <i />
+              <span>{status.label}</span>
+            </div>
+            {health.status === 'offline' && (
+              <p>Run <code>python3 server.py</code>; it starts MATLAB.</p>
+            )}
+            {(health.status === 'online' || health.status === 'busy') && health.info?.model && <p>{health.info.model}</p>}
+          </div>
+          <div className="sidebar-user">
+            <span className="sidebar-user-avatar">{roleLabel[0]}</span>
+            <span>
+              <span className="sidebar-user-name">{roleLabel}</span>
+              <span className="sidebar-user-role">Signed in on this device</span>
+            </span>
+          </div>
+          <button type="button" className="logout-btn" onClick={handleLogout}>
+            <LogOut size={19} />
+            <span>Log out</span>
+          </button>
+        </div>
+      </aside>
 
-          <Link to="/dashboard/account" className={`nav-item ${isActive('/dashboard/account')}`}>
-            <User size={20} />
-            <span>Account Info</span>
-          </Link>
+      <main className="main-content">
+        <div className="dash-topbar">
+          <div className="dash-crumb">
+            <span>Workspace</span>
+            <ChevronRight size={14} />
+            <strong>{current.label}</strong>
+          </div>
+          <div className="dash-topbar-right">
+            <span className="dash-date">
+              {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+            </span>
+            {current.to !== '/dashboard/analysis' && (
+              <Link to="/dashboard/analysis" className="dash-new">
+                <ScanEye size={16} />
+                <span>New screening</span>
+              </Link>
+            )}
+          </div>
         </div>
 
-        <div style={{ marginTop: 'auto', padding: '24px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <div 
-            className="nav-item" 
-            onClick={handleLogout} 
-            style={{ color: '#fc8181', cursor: 'pointer', padding: '0', background: 'transparent' }}
+        {/* Each tab slides in; the old one fades out first */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={current.to}
+            className="dash-page"
+            initial={{ opacity: 0, y: 16, filter: 'blur(6px)' }}
+            // Drop the filter afterwards: any filter traps position:fixed children (e.g. the lightbox)
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)', transitionEnd: { filter: 'none', transform: 'none' } }}
+            exit={{ opacity: 0, y: -8, filter: 'blur(4px)' }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           >
-            <LogOut size={20} />
-            <span>Secure Logout</span>
-          </div>
-        </div>
-      </div>
-
-      {/* MAIN CONTENT AREA */}
-      <div className="main-content" style={{ overflowY: 'auto' }}>
-        <Routes>
-          <Route path="/" element={<OverviewTab />} />
-          <Route path="/analysis" element={<AnalysisTab />} />
-          <Route path="/capacity" element={<CapacityTab />} />
-          <Route path="/account" element={<AccountTab />} />
-        </Routes>
-      </div>
-    </div>
-  );
-}
-
-// Simple Overview Tab (using the dashboard content we had before, simplified)
-function OverviewTab() {
-  return (
-    <div style={{ padding: '20px' }}>
-      <div className="top-bar" style={{ padding: 0, border: 'none', marginBottom: '32px' }}>
-        <div>
-          <div className="date-text">TODAY'S ACTIVITY</div>
-          <h1 className="greeting">Welcome to the Dashboard</h1>
-          <p className="subtitle">Select "AI Analysis" from the sidebar to process fundus images.</p>
-        </div>
-      </div>
-      
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-header">
-            <div className="icon-bg teal"><Activity size={20} /></div>
-            <span>Pipeline Status</span>
-          </div>
-          <div className="stat-value" style={{fontSize:'1.4rem'}}>Online</div>
-          <div className="stat-desc positive">All modules loaded</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-header">
-            <div className="icon-bg orange"><MonitorPlay size={20} /></div>
-            <span>Scans Processed</span>
-          </div>
-          <div className="stat-value">0</div>
-          <div className="stat-desc">This session</div>
-        </div>
-      </div>
+            <Routes location={location}>
+              <Route path="/" element={<Overview />} />
+              <Route path="/analysis" element={<AnalysisTab />} />
+              <Route path="/capacity" element={<CapacityTab />} />
+              <Route path="/account" element={<AccountTab />} />
+            </Routes>
+          </motion.div>
+        </AnimatePresence>
+      </main>
     </div>
   );
 }

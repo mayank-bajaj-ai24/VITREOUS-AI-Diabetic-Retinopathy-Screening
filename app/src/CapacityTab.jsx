@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './CapacityTab.css';
+import FlashDeck from './dashboard/FlashDeck';
 import {
   Activity, Cpu, Wifi, Users, Camera, BarChart3,
   TrendingUp, Gauge, Zap, Server, ChevronRight,
@@ -72,6 +73,96 @@ const OPHTHAL_SWEEP = [
 ];
 
 
+/* Key findings of the SimEvents model, as flash cards */
+const FINDING_CARDS = [
+  {
+    id: 'bottleneck',
+    kicker: 'Capacity',
+    front: (
+      <>
+        <p className="fc-big">{(BASELINE.reviewUtilization * 100).toFixed(1)}%</p>
+        <p className="fc-title">busiest resource: the ophthalmologist</p>
+        <p className="fc-text">Against a 90% operating threshold.</p>
+      </>
+    ),
+    back: (
+      <>
+        <p className="fc-title">No active bottleneck</p>
+        <p className="fc-text">At {BASELINE.patientsPerDay} scheduled patients the camp completes {BASELINE.throughputPerDay}/day. The system is demand-limited, not resource-limited.</p>
+      </>
+    ),
+  },
+  {
+    id: 'ai',
+    kicker: 'AI triage',
+    front: (
+      <>
+        <p className="fc-big">{AI_COMPARISON.workloadReduction}%</p>
+        <p className="fc-title">fewer doctor reviews</p>
+        <p className="fc-text">{BASELINE.autoClearCases} cases auto-cleared per camp.</p>
+      </>
+    ),
+    back: (
+      <>
+        <p className="fc-title">How</p>
+        <p className="fc-text">Cases graded with ≥ 90% confidence are auto-cleared; everything else goes to the ophthalmologist ({AI_COMPARISON.aiOn.reviewCompleted} instead of {AI_COMPARISON.aiOff.reviewCompleted} reviews).</p>
+      </>
+    ),
+  },
+  {
+    id: 'network',
+    kicker: 'Connectivity',
+    front: (
+      <>
+        <p className="fc-big">≥ 5 Mbps</p>
+        <p className="fc-title">keeps the sync backlog stable</p>
+        <p className="fc-text">Screening never waits for the network.</p>
+      </>
+    ),
+    back: (
+      <>
+        <p className="fc-title">At 1 Mbps</p>
+        <p className="fc-text">{BANDWIDTH_SWEEP[0].backlog} images are still unsynced at camp end. Above 5 Mbps the backlog plateaus at {BANDWIDTH_SWEEP[2].backlog}.</p>
+      </>
+    ),
+  },
+  {
+    id: 'threshold',
+    kicker: 'Confidence threshold',
+    front: (
+      <>
+        <p className="fc-big">0.95 → {THRESHOLD_SWEEP[5].referralRate}%</p>
+        <p className="fc-title">referral rate at a strict threshold</p>
+        <p className="fc-text">vs {THRESHOLD_SWEEP[4].referralRate}% at 0.90.</p>
+      </>
+    ),
+    back: (
+      <>
+        <p className="fc-title">The trade-off</p>
+        <p className="fc-text">A stricter auto-clear threshold sends nearly every case to a doctor, wiping out most of the AI workload benefit.</p>
+      </>
+    ),
+  },
+  {
+    id: 'config',
+    kicker: 'Minimum setup',
+    front: (
+      <>
+        <p className="fc-big">1 + 1</p>
+        <p className="fc-title">camera and ophthalmologist</p>
+        <p className="fc-text">with {RESOURCE_RECOMMENDATION.bandwidthMbps} Mbps handle {RESOURCE_RECOMMENDATION.throughputPerDay} patients/day.</p>
+      </>
+    ),
+    back: (
+      <>
+        <p className="fc-title">Adding more doesn’t help</p>
+        <p className="fc-text">Four cameras cut utilisation from 70% to 17.5% but throughput stays at 399/day. Replace these illustrative inputs with field telemetry before deployment.</p>
+      </>
+    ),
+  },
+];
+
+
 /* ═══════════ ANIMATED COUNTER HOOK ═══════════ */
 function useAnimatedValue(target, duration = 1200) {
   const [value, setValue] = useState(0);
@@ -109,7 +200,7 @@ function RadialGauge({ value, label, icon: Icon, color, threshold = 0.9 }) {
             style={{
               strokeDasharray: `2 ${circumference - 2}`,
               strokeDashoffset: -(threshold * circumference),
-              stroke: '#ef4444',
+              stroke: '#1c1f23',
             }} />
         </svg>
         <div className="cap-gauge-center">
@@ -175,12 +266,12 @@ function MiniLineChart({ data, xKey, yKey, color, yLabel }) {
       <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       {points.map((p, i) => (
         <g key={i}>
-          <circle cx={p.x} cy={p.y} r="4" fill="#111827" stroke={color} strokeWidth="2" />
-          <text x={p.x} y={p.y - 10} textAnchor="middle" fill="#94a3b8" fontSize="8" fontWeight="600">
+          <circle cx={p.x} cy={p.y} r="4" fill="#ffffff" stroke={color} strokeWidth="2" />
+          <text x={p.x} y={p.y - 10} textAnchor="middle" fill="#6b7280" fontSize="8" fontWeight="600">
             {typeof data[i][yKey] === 'number' && data[i][yKey] % 1 !== 0
               ? data[i][yKey].toFixed(1) : data[i][yKey]}
           </text>
-          <text x={p.x} y={h - 10} textAnchor="middle" fill="#64748b" fontSize="7.5" fontWeight="500">
+          <text x={p.x} y={h - 10} textAnchor="middle" fill="#9ca3af" fontSize="7.5" fontWeight="500">
             {data[i][xKey]}
           </text>
         </g>
@@ -274,7 +365,7 @@ export default function CapacityTab() {
             <div className="cap-kpi-card">
               <div className="cap-kpi-icon blue"><Activity size={22} /></div>
               <div className="cap-kpi-body">
-                <span className="cap-kpi-label">Bottleneck</span>
+                <span className="cap-kpi-label">Busiest resource</span>
                 <span className="cap-kpi-value" style={{ fontSize: '1.3rem' }}>{BASELINE.bottleneck}</span>
                 <span className="cap-kpi-sub">{(BASELINE.reviewUtilization * 100).toFixed(1)}% utilization</span>
               </div>
@@ -289,6 +380,15 @@ export default function CapacityTab() {
             </div>
           </div>
 
+          <div className="cap-findings">
+            <FlashDeck
+              title="Key findings"
+              subtitle="From the SimEvents discrete-event model"
+              cards={FINDING_CARDS}
+              autoAdvanceMs={8000}
+            />
+          </div>
+
           {/* RESOURCE UTILIZATION GAUGES */}
           <div className="cap-section-card">
             <div className="cap-section-title">
@@ -297,9 +397,9 @@ export default function CapacityTab() {
               <span className="cap-threshold-note">90% threshold</span>
             </div>
             <div className="cap-gauges-row">
-              <RadialGauge value={BASELINE.cameraUtilization} label="Camera" icon={Camera} color="#2dd4bf" />
-              <RadialGauge value={BASELINE.reviewUtilization} label="Ophthalmologist" icon={Eye} color="#f97316" />
-              <RadialGauge value={BASELINE.syncUtilization} label="Network Sync" icon={Wifi} color="#3b82f6" />
+              <RadialGauge value={BASELINE.cameraUtilization} label="Camera" icon={Camera} color="#0b6e69" />
+              <RadialGauge value={BASELINE.reviewUtilization} label="Ophthalmologist" icon={Eye} color="#0b6e69" />
+              <RadialGauge value={BASELINE.syncUtilization} label="Network Sync" icon={Wifi} color="#0b6e69" />
             </div>
           </div>
 
@@ -317,7 +417,7 @@ export default function CapacityTab() {
                 <div className="cap-ai-sub">All cases need doctor</div>
               </div>
               <div className="cap-ai-arrow">
-                <ArrowDownRight size={20} style={{ color: '#22c55e' }} />
+                <ArrowDownRight size={20} style={{ color: '#0b6e69' }} />
                 <span className="cap-ai-reduction">{AI_COMPARISON.workloadReduction}%</span>
                 <span className="cap-ai-reduction-label">fewer reviews</span>
               </div>
@@ -359,7 +459,7 @@ export default function CapacityTab() {
               </div>
             </div>
             <div className="cap-rec-note">
-              <span>⚠️</span> Planning baseline — replace illustrative inputs with measured field telemetry before deployment
+              Planning baseline — replace illustrative inputs with measured field telemetry before deployment
             </div>
           </div>
         </>
@@ -380,7 +480,7 @@ export default function CapacityTab() {
                   data={THRESHOLD_SWEEP}
                   xKey="threshold"
                   yKey="referralRate"
-                  color="#f97316"
+                  color="#0b6e69"
                   yLabel="Referral Rate (%)"
                 />
               </div>
@@ -400,7 +500,7 @@ export default function CapacityTab() {
                   data={BANDWIDTH_SWEEP}
                   xKey="bandwidth"
                   yKey="backlog"
-                  color="#3b82f6"
+                  color="#0b6e69"
                   formatY={v => v}
                 />
               </div>
@@ -420,7 +520,7 @@ export default function CapacityTab() {
                   data={CAMERA_SWEEP}
                   xKey="cameras"
                   yKey="utilization"
-                  color="#2dd4bf"
+                  color="#0b6e69"
                   formatY={v => `${(v * 100).toFixed(0)}%`}
                 />
               </div>
@@ -440,7 +540,7 @@ export default function CapacityTab() {
                   data={OPHTHAL_SWEEP}
                   xKey="doctors"
                   yKey="waitTime"
-                  color="#f97316"
+                  color="#0b6e69"
                   formatY={v => `${v}s`}
                 />
               </div>
@@ -514,12 +614,12 @@ export default function CapacityTab() {
             </div>
             <div className="cap-flow">
               {[
-                { icon: Users, label: 'Patient Arrivals', desc: '400 patients/8-hour camp', color: '#2dd4bf' },
-                { icon: Camera, label: 'Camera Queue + Acquisition', desc: '45s per capture, quality gate recapture loop', color: '#3b82f6' },
-                { icon: Cpu, label: 'AI Light Processing', desc: '2s light path, 8s full path (25% probability)', color: '#f97316' },
-                { icon: Activity, label: 'Confidence Router', desc: '≥90% confidence → auto-clear, else → doctor', color: '#a78bfa' },
-                { icon: Eye, label: 'Ophthalmologist Review', desc: '30s per case, queue-based', color: '#ec4899' },
-                { icon: Wifi, label: 'Deferred Sync Branch', desc: 'Independent network path, backlog on outage', color: '#06b6d4' },
+                { icon: Users, label: 'Patient Arrivals', desc: '400 patients/8-hour camp', color: '#0b6e69' },
+                { icon: Camera, label: 'Camera Queue + Acquisition', desc: '45s per capture, quality gate recapture loop', color: '#0b6e69' },
+                { icon: Cpu, label: 'AI Light Processing', desc: '2s light path, 8s full path (25% probability)', color: '#0b6e69' },
+                { icon: Activity, label: 'Confidence Router', desc: '≥90% confidence → auto-clear, else → doctor', color: '#0b6e69' },
+                { icon: Eye, label: 'Ophthalmologist Review', desc: '30s per case, queue-based', color: '#0b6e69' },
+                { icon: Wifi, label: 'Deferred Sync Branch', desc: 'Independent network path, backlog on outage', color: '#0b6e69' },
               ].map((step, i) => (
                 <div key={i} className="cap-flow-step">
                   <div className="cap-flow-icon" style={{ background: `${step.color}18`, color: step.color }}>

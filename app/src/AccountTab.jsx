@@ -4,6 +4,33 @@ import {
   Calendar, MapPin, Edit3, Save, X,
   BadgeCheck, Clock, FileText, Award
 } from 'lucide-react';
+import FlashDeck from './dashboard/FlashDeck';
+
+/* ICDR grading quick reference (International Clinical Diabetic Retinopathy scale) */
+const ICDR_CARDS = [
+  { grade: 0, name: 'No apparent retinopathy', sign: 'No abnormalities.', action: 'Rescreen in 12 months.' },
+  { grade: 1, name: 'Mild NPDR', sign: 'Microaneurysms only.', action: 'Rescreen in 9–12 months.' },
+  { grade: 2, name: 'Moderate NPDR', sign: 'More than microaneurysms alone, but less than severe NPDR: haemorrhages, hard exudates, cotton-wool spots.', action: 'Refer to an ophthalmologist within 3–6 months.' },
+  { grade: 3, name: 'Severe NPDR', sign: 'The 4-2-1 rule: >20 intraretinal haemorrhages in each of 4 quadrants, venous beading in 2+ quadrants, or prominent IRMA in 1+ quadrant — and no signs of PDR.', action: 'Urgent referral within 2–4 weeks.' },
+  { grade: 4, name: 'Proliferative DR', sign: 'Neovascularisation and/or vitreous or preretinal haemorrhage.', action: 'Immediate referral for laser or anti-VEGF treatment.' },
+].map((g) => ({
+  id: `g${g.grade}`,
+  kicker: `ICDR grade ${g.grade}`,
+  front: (
+    <>
+      <p className="fc-big">G{g.grade}</p>
+      <p className="fc-title">{g.name}</p>
+      <p className="fc-text">What does it look like, and what happens next?</p>
+    </>
+  ),
+  back: (
+    <>
+      <p className="fc-title">{g.name}</p>
+      <p className="fc-text">{g.sign}</p>
+      <p className="fc-text" style={{ marginTop: 8 }}><b>{g.action}</b></p>
+    </>
+  ),
+}));
 
 // Mock user data — in production, this comes from DB via API
 const MOCK_USER = {
@@ -131,6 +158,15 @@ export default function AccountTab() {
               editing={false}
             />
           </div>
+        </div>
+
+        {/* Grading reference */}
+        <div className="account-section account-deck">
+          <FlashDeck
+            title="ICDR grading reference"
+            subtitle="Flip each grade for its signs and follow-up"
+            cards={ICDR_CARDS}
+          />
         </div>
 
         {/* Activity & Stats */}
