@@ -4,7 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <<<<<<< HEAD
+<<<<<<< HEAD
 <title>NETRA Phase 5 — Explainability Code Guide</title>
+=======
+<title>VITREOUS Phase 5 — Explainability Code Guide</title>
+>>>>>>> origin/main
 =======
 <title>VITREOUS Phase 5 — Explainability Code Guide</title>
 >>>>>>> origin/main
@@ -97,7 +101,11 @@
 
 <aside>
 <<<<<<< HEAD
+<<<<<<< HEAD
   <p class="brand">NETRA · Phase 5</p>
+=======
+  <p class="brand">VITREOUS · Phase 5</p>
+>>>>>>> origin/main
 =======
   <p class="brand">VITREOUS · Phase 5</p>
 >>>>>>> origin/main
@@ -124,7 +132,11 @@
 <main>
 <header class="top" id="overview">
 <<<<<<< HEAD
+<<<<<<< HEAD
   <h1>NETRA Phase 5 — Explainability</h1>
+=======
+  <h1>VITREOUS Phase 5 — Explainability</h1>
+>>>>>>> origin/main
 =======
   <h1>VITREOUS Phase 5 — Explainability</h1>
 >>>>>>> origin/main
@@ -213,9 +225,15 @@ That is what makes temperature scaling <em>safe</em>: it cannot turn a "grade 2"
 <h3>Line by line</h3>
 <pre><code>if ~isscalar(T) || ~isfinite(T) || T &lt;= 0
 <<<<<<< HEAD
+<<<<<<< HEAD
     error('NETRA:InvalidTemperature', ...</code></pre>
 <p><code>T</code> must be one positive, finite number. <code>T &le; 0</code> is nonsensical (negative flips the
 ranking; zero divides by zero). I fail loudly with a <code>NETRA:</code> error code, matching the repo convention
+=======
+    error('VITREOUS:InvalidTemperature', ...</code></pre>
+<p><code>T</code> must be one positive, finite number. <code>T &le; 0</code> is nonsensical (negative flips the
+ranking; zero divides by zero). I fail loudly with a <code>VITREOUS:</code> error code, matching the repo convention
+>>>>>>> origin/main
 =======
     error('VITREOUS:InvalidTemperature', ...</code></pre>
 <p><code>T</code> must be one positive, finite number. <code>T &le; 0</code> is nonsensical (negative flips the
@@ -322,7 +340,11 @@ sweet spot — it still has a spatial grid <em>and</em> carries class meaning. T
 <pre><code>canvas = local_prepare_canvas(image_input, cfg, options.Enhanced);   <span class="cmt">% 512×512×3</span></code></pre>
 <p>Reproduces the exact Phase 1 + Phase 2 pipeline (<code>quality_gate</code> then <code>enhance_fundus</code>)
 <<<<<<< HEAD
+<<<<<<< HEAD
 that the rest of NETRA uses — copied from <code>segment_lesions.m</code> so the canvas is bit-identical. The whole
+=======
+that the rest of VITREOUS uses — copied from <code>segment_lesions.m</code> so the canvas is bit-identical. The whole
+>>>>>>> origin/main
 =======
 that the rest of VITREOUS uses — copied from <code>segment_lesions.m</code> so the canvas is bit-identical. The whole
 >>>>>>> origin/main
@@ -352,7 +374,11 @@ because networks run in single precision.</p>
     feat_layer = local_last_conv_layer(net);
     auto_layer = true;
 <<<<<<< HEAD
+<<<<<<< HEAD
     warning('NETRA:GradCAMAutoLayer', ...);
+=======
+    warning('VITREOUS:GradCAMAutoLayer', ...);
+>>>>>>> origin/main
 =======
     warning('VITREOUS:GradCAMAutoLayer', ...);
 >>>>>>> origin/main
@@ -372,7 +398,11 @@ warn</em> that a final figure should choose deliberately.</div>
   For a generic <code>dlnetwork</code>, <code>gradCAM</code> must be told which output to reduce over and which conv
   layer to read; being explicit stops it guessing wrong.</li>
 <<<<<<< HEAD
+<<<<<<< HEAD
   <li>It's wrapped in <code>try/catch</code> → <code>NETRA:GradCAMFailed</code> naming both layers and pointing at
+=======
+  <li>It's wrapped in <code>try/catch</code> → <code>VITREOUS:GradCAMFailed</code> naming both layers and pointing at
+>>>>>>> origin/main
 =======
   <li>It's wrapped in <code>try/catch</code> → <code>VITREOUS:GradCAMFailed</code> naming both layers and pointing at
 >>>>>>> origin/main
@@ -511,7 +541,11 @@ the same "reason only inside the retina" principle as the IoU metric.</p>
 <p>Blend each class's canonical color (from <code>lesion_classes()</code>) 50/50 over the fundus. <b>50%</b> so you
 see both the lesion color <em>and</em> the retina underneath (opaque would hide whether the mask is really on a
 <<<<<<< HEAD
+<<<<<<< HEAD
 lesion). Then <code>overlay_legend</code> — Phase 3's own renderer, reused so colors match every NETRA figure.</p>
+=======
+lesion). Then <code>overlay_legend</code> — Phase 3's own renderer, reused so colors match every VITREOUS figure.</p>
+>>>>>>> origin/main
 =======
 lesion). Then <code>overlay_legend</code> — Phase 3's own renderer, reused so colors match every VITREOUS figure.</p>
 >>>>>>> origin/main
@@ -627,7 +661,11 @@ panel "Occlusion sensitivity" instead of "Grad-CAM". A flat network (like the de
   and writes a PDF. The two interface points I flagged as risky both held up in practice: the <code>gradCAM</code>
   call (verified by <code>testGradCAMShapeAndRange</code>) and the report's defensive <code>r.stats</code> reader
 <<<<<<< HEAD
+<<<<<<< HEAD
   (the demo rendered a report without error). They still fail loudly with <code>NETRA:</code> messages if a future
+=======
+  (the demo rendered a report without error). They still fail loudly with <code>VITREOUS:</code> messages if a future
+>>>>>>> origin/main
 =======
   (the demo rendered a report without error). They still fail loudly with <code>VITREOUS:</code> messages if a future
 >>>>>>> origin/main
@@ -645,9 +683,12 @@ panel "Occlusion sensitivity" instead of "Grad-CAM". A flat network (like the de
 <thead><tr><th>Date</th><th>Change</th></tr></thead>
 <tbody>
 <<<<<<< HEAD
+<<<<<<< HEAD
 <tr><td>2026-09-23</td><td><b>Professional single-page report redesign.</b> Rebuilt <code>generate_pdf_report.m</code>
 around clinician feedback: NETRA logo + wordmark and patient header up top, a round severity badge, a compact grade
 =======
+=======
+>>>>>>> origin/main
 <tr><td>2026-09-25</td><td><b>Score-CAM added (second attention method).</b> <code>generate_scorecam.m</code> — a
 gradient-free attention map that works on the nested hybrid (unlike Grad-CAM): each late-conv feature map is used as
 a soft mask on the image, scored by the class response, and the maps are weighted by those scores. It extracts the
@@ -657,6 +698,9 @@ the two independent methods agree (map correlation + each one's lesion alignment
 map with a second method, not replace it.</td></tr>
 <tr><td>2026-09-23</td><td><b>Professional single-page report redesign.</b> Rebuilt <code>generate_pdf_report.m</code>
 around clinician feedback: VITREOUS logo + wordmark and patient header up top, a round severity badge, a compact grade
+<<<<<<< HEAD
+>>>>>>> origin/main
+=======
 >>>>>>> origin/main
 probability strip, and only the three doctor-relevant images (enhanced fundus, AI findings with lesions marked, AI
 attention). Dropped the engineering pipeline montage and pixel-level anatomy; findings are now concise (lesions
@@ -712,7 +756,11 @@ config sections. This guide created.</td></tr>
 
 <footer>
 <<<<<<< HEAD
+<<<<<<< HEAD
   NETRA — National Eye Triage &amp; Retinal Assessment · Phase 5 Explainability · Owner: Kathan ·
+=======
+  VITREOUS — National Eye Triage &amp; Retinal Assessment · Phase 5 Explainability · Owner: Kathan ·
+>>>>>>> origin/main
 =======
   VITREOUS — National Eye Triage &amp; Retinal Assessment · Phase 5 Explainability · Owner: Kathan ·
 >>>>>>> origin/main

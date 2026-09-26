@@ -164,7 +164,11 @@ for i = 1:numel(layers)
 end
 if isempty(name)
 <<<<<<< HEAD
+<<<<<<< HEAD
     error('NETRA:NoConvLayer', 'No convolution layer found for Score-CAM.');
+=======
+    error('VITREOUS:NoConvLayer', 'No convolution layer found for Score-CAM.');
+>>>>>>> origin/main
 =======
     error('VITREOUS:NoConvLayer', 'No convolution layer found for Score-CAM.');
 >>>>>>> origin/main
@@ -193,7 +197,11 @@ if enhanced
     canvas = im2double(image_input);
     if size(canvas, 1) ~= canvas_size || size(canvas, 2) ~= canvas_size
 <<<<<<< HEAD
+<<<<<<< HEAD
         error('NETRA:CanvasSizeMismatch', 'Enhanced input must be %dx%d.', canvas_size, canvas_size);
+=======
+        error('VITREOUS:CanvasSizeMismatch', 'Enhanced input must be %dx%d.', canvas_size, canvas_size);
+>>>>>>> origin/main
 =======
         error('VITREOUS:CanvasSizeMismatch', 'Enhanced input must be %dx%d.', canvas_size, canvas_size);
 >>>>>>> origin/main
@@ -205,7 +213,11 @@ if size(raw, 3) == 1, raw = repmat(raw, 1, 1, 3); end
 quality = quality_gate(raw, cfg);
 if ~quality.is_passed
 <<<<<<< HEAD
+<<<<<<< HEAD
     error('NETRA:QualityGateFailed', 'Image failed the quality gate (%s). %s', ...
+=======
+    error('VITREOUS:QualityGateFailed', 'Image failed the quality gate (%s). %s', ...
+>>>>>>> origin/main
 =======
     error('VITREOUS:QualityGateFailed', 'Image failed the quality gate (%s). %s', ...
 >>>>>>> origin/main
@@ -221,7 +233,11 @@ for i = 1:numel(net.Layers)
     if isprop(L, 'InputSize') && ~isempty(L.InputSize), sz = L.InputSize(1); return; end
 end
 <<<<<<< HEAD
+<<<<<<< HEAD
 error('NETRA:NoInputLayer', 'Could not read the network input size.');
+=======
+error('VITREOUS:NoInputLayer', 'Could not read the network input size.');
+>>>>>>> origin/main
 =======
 error('VITREOUS:NoInputLayer', 'Could not read the network input size.');
 >>>>>>> origin/main

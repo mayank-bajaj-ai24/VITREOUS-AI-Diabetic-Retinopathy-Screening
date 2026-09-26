@@ -1,6 +1,10 @@
 function out_path = generate_pdf_report(output_path, r, g, xai, cfg, options)
 <<<<<<< HEAD
+<<<<<<< HEAD
 % GENERATE_PDF_REPORT  One-page NETRA clinical DR screening report (PDF)
+=======
+% GENERATE_PDF_REPORT  One-page VITREOUS clinical DR screening report (PDF)
+>>>>>>> origin/main
 =======
 % GENERATE_PDF_REPORT  One-page VITREOUS clinical DR screening report (PDF)
 >>>>>>> origin/main
@@ -12,7 +16,11 @@ function out_path = generate_pdf_report(output_path, r, g, xai, cfg, options)
 %   patient header, the DR grade and referral decision, three clinically
 %   meaningful images (enhanced fundus, annotated findings, AI attention), a
 <<<<<<< HEAD
+<<<<<<< HEAD
 %   concise findings summary with NETRA's explainability result, and a clear
+=======
+%   concise findings summary with VITREOUS's explainability result, and a clear
+>>>>>>> origin/main
 =======
 %   concise findings summary with VITREOUS's explainability result, and a clear
 >>>>>>> origin/main
@@ -74,7 +82,11 @@ label_map = double(r.label_map);
 ink   = [0.13 0.16 0.22];
 mute  = [0.45 0.50 0.58];
 <<<<<<< HEAD
+<<<<<<< HEAD
 brand = [0.10 0.42 0.62];       % NETRA blue
+=======
+brand = [0.10 0.42 0.62];       % VITREOUS blue
+>>>>>>> origin/main
 =======
 brand = [0.10 0.42 0.62];       % VITREOUS blue
 >>>>>>> origin/main
@@ -97,7 +109,11 @@ sq = @(w) w * W / H;   % normalized height that renders square for a given width
 % ── Header: logo + wordmark (left), patient details (right) ──
 local_logo_box(fig, root, [0.035 0.920 0.052]);
 <<<<<<< HEAD
+<<<<<<< HEAD
 annotation(fig, 'textbox', [0.098 0.937 0.4 0.026], 'String', 'NETRA', ...
+=======
+annotation(fig, 'textbox', [0.098 0.937 0.4 0.026], 'String', 'VITREOUS', ...
+>>>>>>> origin/main
 =======
 annotation(fig, 'textbox', [0.098 0.937 0.4 0.026], 'String', 'VITREOUS', ...
 >>>>>>> origin/main
@@ -183,7 +199,11 @@ annotation(fig, 'textbox', [0.055 0.130 0.90 0.078], 'String', ...
 annotation(fig, 'line', [0.035 0.965], [0.058 0.058], 'Color', hair);
 annotation(fig, 'textbox', [0.035 0.018 0.93 0.035], 'String', ...
 <<<<<<< HEAD
+<<<<<<< HEAD
     ['NETRA · National Eye Triage & Retinal Assessment     |     ' char(string(disclaimer))], ...
+=======
+    ['VITREOUS · National Eye Triage & Retinal Assessment     |     ' char(string(disclaimer))], ...
+>>>>>>> origin/main
 =======
     ['VITREOUS · National Eye Triage & Retinal Assessment     |     ' char(string(disclaimer))], ...
 >>>>>>> origin/main
@@ -200,9 +220,15 @@ end
 
 function local_logo_box(fig, root, pos3)
 <<<<<<< HEAD
+<<<<<<< HEAD
 % Place the NETRA logo (composited over white) as a small square, top-left.
 try
     lp = fullfile(root, 'app', 'public', 'netra_logo.png');
+=======
+% Place the VITREOUS logo (composited over white) as a small square, top-left.
+try
+    lp = fullfile(root, 'app', 'public', 'vitreous_logo.png');
+>>>>>>> origin/main
 =======
 % Place the VITREOUS logo (composited over white) as a small square, top-left.
 try
@@ -306,7 +332,11 @@ end
 
 function lines = local_xai_summary(xai, g) %#ok<INUSD>
 <<<<<<< HEAD
+<<<<<<< HEAD
 % NETRA's explainability, in a sentence a clinician can act on.
+=======
+% VITREOUS's explainability, in a sentence a clinician can act on.
+>>>>>>> origin/main
 =======
 % VITREOUS's explainability, in a sentence a clinician can act on.
 >>>>>>> origin/main
@@ -424,7 +454,11 @@ elseif isfield(g, 'probs') && ~isempty(g.probs)
     probs = g.probs;
 else
 <<<<<<< HEAD
+<<<<<<< HEAD
     error('NETRA:NoProbabilities', 'Grade result has neither .probabilities nor .probs.');
+=======
+    error('VITREOUS:NoProbabilities', 'Grade result has neither .probabilities nor .probs.');
+>>>>>>> origin/main
 =======
     error('VITREOUS:NoProbabilities', 'Grade result has neither .probabilities nor .probs.');
 >>>>>>> origin/main
@@ -441,7 +475,11 @@ elseif isfield(options, 'Canvas') && ~isempty(options.Canvas)
     canvas = options.Canvas;
 else
 <<<<<<< HEAD
+<<<<<<< HEAD
     error('NETRA:NoCanvas', ...
+=======
+    error('VITREOUS:NoCanvas', ...
+>>>>>>> origin/main
 =======
     error('VITREOUS:NoCanvas', ...
 >>>>>>> origin/main

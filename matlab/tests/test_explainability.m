@@ -140,7 +140,11 @@ gc = struct('score_map_canvas', att, 'canvas', repmat(0.4, 512, 512, 3), ...
     'feature_layer', "effnet/conv_last");
 xai = struct('gradcam', gc, 'iou', attention_lesion_iou(att, r, testCase.TestData.cfg));
 <<<<<<< HEAD
+<<<<<<< HEAD
 out = fullfile(tempdir, ['netra_report_' char(matlab.lang.internal.uuid()) '.pdf']);
+=======
+out = fullfile(tempdir, ['vitreous_report_' char(matlab.lang.internal.uuid()) '.pdf']);
+>>>>>>> origin/main
 =======
 out = fullfile(tempdir, ['vitreous_report_' char(matlab.lang.internal.uuid()) '.pdf']);
 >>>>>>> origin/main

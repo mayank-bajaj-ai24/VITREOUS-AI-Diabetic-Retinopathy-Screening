@@ -5,7 +5,10 @@ import Login from './Login';
 import Dashboard from './Dashboard';
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> origin/main
 const LOGO = '/vitreous_logo.png';
 import { 
   Eye, LayoutDashboard, MonitorPlay, MessageSquare, Activity, Settings,

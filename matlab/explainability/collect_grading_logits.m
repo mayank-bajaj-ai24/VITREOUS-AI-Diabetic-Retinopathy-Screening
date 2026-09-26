@@ -55,7 +55,11 @@ N = numel(images);
 grades = double(grades(:));
 if numel(grades) ~= N
 <<<<<<< HEAD
+<<<<<<< HEAD
     error('NETRA:LabelCount', 'images has %d entries but grades has %d.', N, numel(grades));
+=======
+    error('VITREOUS:LabelCount', 'images has %d entries but grades has %d.', N, numel(grades));
+>>>>>>> origin/main
 =======
     error('VITREOUS:LabelCount', 'images has %d entries but grades has %d.', N, numel(grades));
 >>>>>>> origin/main
