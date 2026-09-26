@@ -130,15 +130,7 @@ else
             use_occlusion = true;
         end
     catch ME_grad
-<<<<<<< HEAD
-<<<<<<< HEAD
-        warning('NETRA:GradCAMFallback', ...
-=======
         warning('VITREOUS:GradCAMFallback', ...
->>>>>>> origin/main
-=======
-        warning('VITREOUS:GradCAMFallback', ...
->>>>>>> origin/main
             'Grad-CAM could not run (%s); using occlusion sensitivity.', ME_grad.message);
         use_occlusion = true;
     end
