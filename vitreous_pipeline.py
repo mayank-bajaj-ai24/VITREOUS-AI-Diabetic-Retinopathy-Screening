@@ -1,5 +1,5 @@
 """
-NETRA Full Image Analysis Pipeline (Python Native Engine)
+VITREOUS Full Image Analysis Pipeline (Python Native Engine)
 Implements Phase 1 Quality Gate, Phase 2 CLAHE/NLM Enhancement,
 Phase 4 DR Severity Grading, and Phase 5 Grad-CAM Attention Heatmaps.
 """
@@ -16,7 +16,7 @@ from PIL import Image
 
 class StubGradingCNN(nn.Module):
     """
-    5-Class Fundus DR Grading CNN (matching NETRA make_stub_grading_net contract).
+    5-Class Fundus DR Grading CNN (matching VITREOUS make_stub_grading_net contract).
     Exposes conv features for Grad-CAM explainability.
     """
     def __init__(self, num_classes=5):
@@ -336,7 +336,7 @@ def mat_to_base64_png(img_bgr):
 def process_fundus_analysis(img_bytes):
     """
     Main entry point for processing fundus analysis request.
-    Takes raw image bytes, runs entire NETRA pipeline, and returns result dict.
+    Takes raw image bytes, runs entire VITREOUS pipeline, and returns result dict.
     """
     nparr = np.frombuffer(img_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)

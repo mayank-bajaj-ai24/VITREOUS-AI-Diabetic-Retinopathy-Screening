@@ -3,15 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<<<<<<< HEAD
-<<<<<<< HEAD
-<title>NETRA Phase 5 — Explainability Code Guide</title>
-=======
 <title>VITREOUS Phase 5 — Explainability Code Guide</title>
->>>>>>> origin/main
-=======
-<title>VITREOUS Phase 5 — Explainability Code Guide</title>
->>>>>>> origin/main
 <style>
   :root{
     --bg:#f7f8fa; --panel:#ffffff; --ink:#1c2430; --muted:#5a6675;
@@ -100,15 +92,7 @@
 <div class="wrap">
 
 <aside>
-<<<<<<< HEAD
-<<<<<<< HEAD
-  <p class="brand">NETRA · Phase 5</p>
-=======
   <p class="brand">VITREOUS · Phase 5</p>
->>>>>>> origin/main
-=======
-  <p class="brand">VITREOUS · Phase 5</p>
->>>>>>> origin/main
   <p class="sub">Explainability code guide</p>
   <nav>
     <a href="#overview">Overview</a>
@@ -131,15 +115,7 @@
 
 <main>
 <header class="top" id="overview">
-<<<<<<< HEAD
-<<<<<<< HEAD
-  <h1>NETRA Phase 5 — Explainability</h1>
-=======
   <h1>VITREOUS Phase 5 — Explainability</h1>
->>>>>>> origin/main
-=======
-  <h1>VITREOUS Phase 5 — Explainability</h1>
->>>>>>> origin/main
   <p class="lede">A line-by-line guide to the code: what it does, how it works, why each
   technology and each number was chosen. Written to be re-read, and updated as the project changes.</p>
   <div class="meta">
@@ -224,21 +200,9 @@ That is what makes temperature scaling <em>safe</em>: it cannot turn a "grade 2"
 
 <h3>Line by line</h3>
 <pre><code>if ~isscalar(T) || ~isfinite(T) || T &lt;= 0
-<<<<<<< HEAD
-<<<<<<< HEAD
-    error('NETRA:InvalidTemperature', ...</code></pre>
-<p><code>T</code> must be one positive, finite number. <code>T &le; 0</code> is nonsensical (negative flips the
-ranking; zero divides by zero). I fail loudly with a <code>NETRA:</code> error code, matching the repo convention
-=======
     error('VITREOUS:InvalidTemperature', ...</code></pre>
 <p><code>T</code> must be one positive, finite number. <code>T &le; 0</code> is nonsensical (negative flips the
 ranking; zero divides by zero). I fail loudly with a <code>VITREOUS:</code> error code, matching the repo convention
->>>>>>> origin/main
-=======
-    error('VITREOUS:InvalidTemperature', ...</code></pre>
-<p><code>T</code> must be one positive, finite number. <code>T &le; 0</code> is nonsensical (negative flips the
-ranking; zero divides by zero). I fail loudly with a <code>VITREOUS:</code> error code, matching the repo convention
->>>>>>> origin/main
 so callers can <code>try/catch</code> on it.</p>
 
 <pre><code>if isvector(logits)
@@ -339,15 +303,7 @@ sweet spot — it still has a spatial grid <em>and</em> carries class meaning. T
 <h3>Preparing the canvas</h3>
 <pre><code>canvas = local_prepare_canvas(image_input, cfg, options.Enhanced);   <span class="cmt">% 512×512×3</span></code></pre>
 <p>Reproduces the exact Phase 1 + Phase 2 pipeline (<code>quality_gate</code> then <code>enhance_fundus</code>)
-<<<<<<< HEAD
-<<<<<<< HEAD
-that the rest of NETRA uses — copied from <code>segment_lesions.m</code> so the canvas is bit-identical. The whole
-=======
 that the rest of VITREOUS uses — copied from <code>segment_lesions.m</code> so the canvas is bit-identical. The whole
->>>>>>> origin/main
-=======
-that the rest of VITREOUS uses — copied from <code>segment_lesions.m</code> so the canvas is bit-identical. The whole
->>>>>>> origin/main
 point is that the heatmap aligns with Phase 3 masks, and they only align on the identical enhanced 512 canvas.
 If <code>options.Enhanced</code> is true, the caller already has the canvas; we skip re-enhancing and error on a
 size mismatch (a silent misalignment otherwise).</p>
@@ -373,15 +329,7 @@ because networks run in single precision.</p>
 <pre><code>if isempty(char(feat_layer))
     feat_layer = local_last_conv_layer(net);
     auto_layer = true;
-<<<<<<< HEAD
-<<<<<<< HEAD
-    warning('NETRA:GradCAMAutoLayer', ...);
-=======
     warning('VITREOUS:GradCAMAutoLayer', ...);
->>>>>>> origin/main
-=======
-    warning('VITREOUS:GradCAMAutoLayer', ...);
->>>>>>> origin/main
 end</code></pre>
 <div class="why"><b>Why warn instead of silently picking?</b> For a two-branch model (ResNet ∥ EfficientNet) the
 layer choice is a real editorial decision, and the report must state <em>which branch</em> it explains. If you set
@@ -397,15 +345,7 @@ warn</em> that a final figure should choose deliberately.</div>
   <li>I pass the <b>class index</b> and an explicit <b><code>ReductionLayer</code></b> (<code>'softmax'</code>).
   For a generic <code>dlnetwork</code>, <code>gradCAM</code> must be told which output to reduce over and which conv
   layer to read; being explicit stops it guessing wrong.</li>
-<<<<<<< HEAD
-<<<<<<< HEAD
-  <li>It's wrapped in <code>try/catch</code> → <code>NETRA:GradCAMFailed</code> naming both layers and pointing at
-=======
   <li>It's wrapped in <code>try/catch</code> → <code>VITREOUS:GradCAMFailed</code> naming both layers and pointing at
->>>>>>> origin/main
-=======
-  <li>It's wrapped in <code>try/catch</code> → <code>VITREOUS:GradCAMFailed</code> naming both layers and pointing at
->>>>>>> origin/main
   <code>analyzeNetwork</code>. When a layer name is wrong you get an actionable message, not a cryptic trace.</li>
 </ul>
 
@@ -540,15 +480,7 @@ the same "reason only inside the retina" principle as the IoU metric.</p>
 <pre><code>chan(mask) = 0.5 * chan(mask) + 0.5 * color(ch);</code></pre>
 <p>Blend each class's canonical color (from <code>lesion_classes()</code>) 50/50 over the fundus. <b>50%</b> so you
 see both the lesion color <em>and</em> the retina underneath (opaque would hide whether the mask is really on a
-<<<<<<< HEAD
-<<<<<<< HEAD
-lesion). Then <code>overlay_legend</code> — Phase 3's own renderer, reused so colors match every NETRA figure.</p>
-=======
 lesion). Then <code>overlay_legend</code> — Phase 3's own renderer, reused so colors match every VITREOUS figure.</p>
->>>>>>> origin/main
-=======
-lesion). Then <code>overlay_legend</code> — Phase 3's own renderer, reused so colors match every VITREOUS figure.</p>
->>>>>>> origin/main
 
 <h3>Defensive stat reader</h3>
 <pre><code>st.pixels = local_field(s, {'pixels','pixel_count','area'}, 0);</code></pre>
@@ -660,15 +592,7 @@ panel "Occlusion sensitivity" instead of "Grad-CAM". A flat network (like the de
   <li><b>Validated on MATLAB Online R2026a (2026-09-14).</b> All 14 unit tests pass and the end-to-end demo runs
   and writes a PDF. The two interface points I flagged as risky both held up in practice: the <code>gradCAM</code>
   call (verified by <code>testGradCAMShapeAndRange</code>) and the report's defensive <code>r.stats</code> reader
-<<<<<<< HEAD
-<<<<<<< HEAD
-  (the demo rendered a report without error). They still fail loudly with <code>NETRA:</code> messages if a future
-=======
   (the demo rendered a report without error). They still fail loudly with <code>VITREOUS:</code> messages if a future
->>>>>>> origin/main
-=======
-  (the demo rendered a report without error). They still fail loudly with <code>VITREOUS:</code> messages if a future
->>>>>>> origin/main
   change breaks them.</li>
   <li><b>Grade and heatmap are meaningless until Phase 4 exists</b> — random-weight stub. Code paths are real and
   tested; predictions are not.</li>
@@ -682,13 +606,6 @@ panel "Occlusion sensitivity" instead of "Grad-CAM". A flat network (like the de
 <table>
 <thead><tr><th>Date</th><th>Change</th></tr></thead>
 <tbody>
-<<<<<<< HEAD
-<<<<<<< HEAD
-<tr><td>2026-09-23</td><td><b>Professional single-page report redesign.</b> Rebuilt <code>generate_pdf_report.m</code>
-around clinician feedback: NETRA logo + wordmark and patient header up top, a round severity badge, a compact grade
-=======
-=======
->>>>>>> origin/main
 <tr><td>2026-09-25</td><td><b>Score-CAM added (second attention method).</b> <code>generate_scorecam.m</code> — a
 gradient-free attention map that works on the nested hybrid (unlike Grad-CAM): each late-conv feature map is used as
 a soft mask on the image, scored by the class response, and the maps are weighted by those scores. It extracts the
@@ -698,10 +615,6 @@ the two independent methods agree (map correlation + each one's lesion alignment
 map with a second method, not replace it.</td></tr>
 <tr><td>2026-09-23</td><td><b>Professional single-page report redesign.</b> Rebuilt <code>generate_pdf_report.m</code>
 around clinician feedback: VITREOUS logo + wordmark and patient header up top, a round severity badge, a compact grade
-<<<<<<< HEAD
->>>>>>> origin/main
-=======
->>>>>>> origin/main
 probability strip, and only the three doctor-relevant images (enhanced fundus, AI findings with lesions marked, AI
 attention). Dropped the engineering pipeline montage and pixel-level anatomy; findings are now concise (lesions
 present, macular proximity, and the explainability sentence: attention on lesion regions vs chance) with a clear
@@ -755,15 +668,7 @@ config sections. This guide created.</td></tr>
 </table>
 
 <footer>
-<<<<<<< HEAD
-<<<<<<< HEAD
-  NETRA — National Eye Triage &amp; Retinal Assessment · Phase 5 Explainability · Owner: Kathan ·
-=======
-  VITREOUS — National Eye Triage &amp; Retinal Assessment · Phase 5 Explainability · Owner: Kathan ·
->>>>>>> origin/main
-=======
-  VITREOUS — National Eye Triage &amp; Retinal Assessment · Phase 5 Explainability · Owner: Kathan ·
->>>>>>> origin/main
+  VITREOUS — AI Diabetic Retinopathy Screening &amp; Clinical Triage · Phase 5 Explainability · Owner: Kathan ·
   Kept in sync with the code on the <code>Kathan</code> branch. When we change the module, this file and its
   changelog are updated in the same commit.
 </footer>

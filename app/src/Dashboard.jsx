@@ -5,7 +5,7 @@ import AnalysisTab from './AnalysisTab';
 import CapacityTab from './CapacityTab';
 import AccountTab from './AccountTab';
 
-const LOGO = '/netra_logo.png';
+const LOGO = '/vitreous_logo.png';
 
 export default function Dashboard() {
   const location = useLocation();

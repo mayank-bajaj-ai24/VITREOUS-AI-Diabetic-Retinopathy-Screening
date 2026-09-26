@@ -217,13 +217,13 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# NETRA: generated demo output
+# VITREOUS: generated demo output
 data/sample_images/segmentation_output/
 
-# NETRA: datasets are large and externally sourced - never commit them
+# VITREOUS: datasets are large and externally sourced - never commit them
 data/datasets/
 
-# NETRA: prepared training tiles are regenerable from data/datasets.
+# VITREOUS: prepared training tiles are regenerable from data/datasets.
 # Contents are excluded rather than the directory itself, because git cannot
 # re-include a file whose parent directory is excluded, and the recommended
 # model below has to survive that rule.
@@ -238,10 +238,10 @@ data/processed/models/*
 # predictions, not a stub. Large binary, tracked by LFS (.gitattributes).
 !data/processed/models/dr_grading_hires.mat
 
-# NETRA: generated walkthrough output
+# VITREOUS: generated walkthrough output
 data/sample_images/walkthrough/
 
-# NETRA: model snapshots and comparison output
+# VITREOUS: model snapshots and comparison output
 data/sample_images/comparison/
 
 # DR Screening Capacity Model: generated Simulink caches and local deck dependencies

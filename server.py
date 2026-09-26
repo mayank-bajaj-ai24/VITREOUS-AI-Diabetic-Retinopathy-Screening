@@ -8,7 +8,7 @@ import tempfile
 import base64
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import netra_pipeline
+import vitreous_pipeline
 
 app = Flask(__name__)
 CORS(app)
@@ -32,8 +32,8 @@ def analyze():
         raw_b64 = base64_payload.split(',', 1)[-1] if ',' in base64_payload else base64_payload
         img_bytes = base64.b64decode(raw_b64)
 
-        # 2. Run the high-performance NETRA pipeline (Quality Gate + Enhancement + DR Grading + Grad-CAM)
-        result = netra_pipeline.process_fundus_analysis(img_bytes)
+        # 2. Run the high-performance VITREOUS pipeline (Quality Gate + Enhancement + DR Grading + Grad-CAM)
+        result = vitreous_pipeline.process_fundus_analysis(img_bytes)
         
         elapsed = time.time() - t_start
         print(f"[API] Pipeline finished in {elapsed:.2f}s with status: {result.get('status')}")
@@ -54,7 +54,7 @@ def health():
     """Quick check to verify server is active."""
     return jsonify({
         "status": "ok",
-        "engine": "netra-pipeline",
+        "engine": "vitreous-pipeline",
         "model": "v4_resnet18/stub",
         "version": "1.0.0"
     })
@@ -62,7 +62,7 @@ def health():
 
 if __name__ == '__main__':
     print("=======================================")
-    print("  NETRA Python Backend API is running! ")
+    print("  VITREOUS Python Backend API is running! ")
     print("  Pipeline: Quality Gate + CLAHE + DR Grading + Grad-CAM")
     print("  Listening on http://localhost:5000   ")
     print("  React app at  http://localhost:5173  ")
